@@ -23,7 +23,7 @@ pub fn bootstrap() -> Result<(), BootstrapError> {
                     _ => return Err(BootstrapError::LogLevelError(Some(level))),
                 },
                 #[cfg(debug_assertions)]
-                Err(_) => Level::TRACE,
+                Err(_) => Level::DEBUG,
                 #[cfg(not(debug_assertions))]
                 Err(_) => Level::INFO,
             }
