@@ -1,4 +1,6 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
+use thiserror::Error;
+use tracing::error;
 use wgpu::{
     include_wgsl, Backends, BlendState, ColorTargetState, ColorWrites, Device, DeviceDescriptor,
     Face, Features, FragmentState, FrontFace, Instance, Limits, MultisampleState,
@@ -7,6 +9,14 @@ use wgpu::{
     Surface, SurfaceConfiguration, TextureUsages, VertexState,
 };
 use winit::{dpi::PhysicalSize, window::Window};
+
+#[derive(Error, Debug)]
+pub enum GraphicsError {
+    #[error("Supported adapters not found")]
+    AdapterNotFound,
+    #[error("Adapter doesn't have compatible surface format")]
+    CompatibleSurfaceFormatNotFound,
+}
 
 /// Handler for GPU device connection
 pub struct Graphics {
@@ -30,15 +40,20 @@ impl Graphics {
         let surface = unsafe { instance.create_surface(window) };
 
         // Request handle to physical graphical adapter
-        // TODO: Handle errors better
-        let adapter = instance
+        let adapter = match instance
             .request_adapter(&RequestAdapterOptions {
                 power_preference: PowerPreference::HighPerformance,
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
             .await
-            .unwrap();
+        {
+            Some(adapter) => adapter,
+            None => {
+                error!("Supported adapters not found");
+                bail!(GraphicsError::AdapterNotFound)
+            }
+        };
 
         // device: connection to graphic device
         // queue: commands buffer
@@ -56,8 +71,13 @@ impl Graphics {
 
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
-            // TODO: Handle case when there's no supported formats
-            format: surface.get_supported_formats(&adapter)[0],
+            format: match surface.get_supported_formats(&adapter).get(0) {
+                Some(format) => *format,
+                None => {
+                    error!("Adapter doesn't have compatible surface format");
+                    bail!(GraphicsError::CompatibleSurfaceFormatNotFound)
+                }
+            },
             width: size.width,
             height: size.height,
             // Rendering mode
