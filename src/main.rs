@@ -2,17 +2,17 @@ pub mod bootstrap;
 pub mod game;
 pub mod graphics;
 pub mod run;
-pub mod window;
 pub mod utils;
+pub mod window;
 
 use anyhow::{Context, Result};
 use tokio::runtime::Builder;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
 use bootstrap::bootstrap;
 use run::run;
 
-use crate::{game::Game, graphics::Graphics, window::Window, utils::VERSION};
+use crate::{game::Game, graphics::Graphics, utils::VERSION, window::Window};
 
 fn main() -> Result<()> {
     bootstrap()?;

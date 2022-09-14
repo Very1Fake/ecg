@@ -1,7 +1,10 @@
 use std::iter::once;
 
 use tracing::debug;
-use wgpu::{SurfaceError, TextureViewDescriptor, RenderPassDescriptor, CommandEncoderDescriptor, RenderPassColorAttachment, Operations, LoadOp, Color};
+use wgpu::{
+    Color, CommandEncoderDescriptor, LoadOp, Operations, RenderPassColorAttachment,
+    RenderPassDescriptor, SurfaceError, TextureViewDescriptor,
+};
 use winit::{
     event::{KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
@@ -62,7 +65,7 @@ impl Game {
                 label: Some("Block Pipe Encoder"),
             });
 
-        let render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
             label: Some("Block Render Pass"),
             // Where to we draw colors
             color_attachments: &[Some(RenderPassColorAttachment {
@@ -84,6 +87,9 @@ impl Game {
             })],
             depth_stencil_attachment: None,
         });
+
+        render_pass.set_pipeline(&self.graphics.render_pipeline);
+        render_pass.draw(0..3, 0..1);
 
         drop(render_pass);
 

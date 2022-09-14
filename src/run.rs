@@ -1,8 +1,8 @@
-use tracing::{info, error};
+use tracing::{error, info};
 use wgpu::SurfaceError;
 use winit::event::{Event, WindowEvent};
 
-use crate::{game::Game, window::Window, utils::ExitCode};
+use crate::{game::Game, utils::ExitCode, window::Window};
 
 pub async fn run(window: Window, mut game: Game) {
     window.event_loop.run(move |event, _, control_flow| {

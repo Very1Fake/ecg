@@ -1,5 +1,8 @@
 use anyhow::Result;
-use winit::{event_loop::EventLoop, window::{WindowBuilder, Window as WinitWindow}};
+use winit::{
+    event_loop::EventLoop,
+    window::{Window as WinitWindow, WindowBuilder},
+};
 
 /// Handler for Winit Window and EventLoop
 pub struct Window {
