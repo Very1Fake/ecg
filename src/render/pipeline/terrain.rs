@@ -2,10 +2,10 @@ use wgpu::{
     BindGroupLayout, BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType,
     ColorTargetState, ColorWrites, Device, Face, FragmentState, FrontFace, MultisampleState,
     PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
-    RenderPipeline, RenderPipelineDescriptor, ShaderStages, SurfaceConfiguration, VertexState,
+    RenderPipeline, RenderPipelineDescriptor, ShaderStages, SurfaceConfiguration, VertexState, DepthStencilState, CompareFunction, StencilState, DepthBiasState,
 };
 
-use crate::{primitives::vertex::Vertex, render::shader::ShaderStore};
+use crate::{primitives::vertex::Vertex, render::{shader::ShaderStore, texture::Texture}};
 
 pub struct TerrainPipeline {
     pub pipeline: RenderPipeline,
@@ -50,7 +50,7 @@ impl TerrainPipeline {
                 // Use vertices as triangles
                 topology: PrimitiveTopology::TriangleList,
                 strip_index_format: None,
-                front_face: FrontFace::Ccw,
+                front_face: FrontFace::Cw,
                 cull_mode: Some(Face::Back),
                 unclipped_depth: false,
                 // Used for example to draw wireframes
@@ -59,7 +59,13 @@ impl TerrainPipeline {
                 conservative: false,
             },
             // No depth yet
-            depth_stencil: None,
+            depth_stencil: Some(DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: CompareFunction::Less,
+                stencil: StencilState::default(),
+                bias: DepthBiasState::default(),
+            }),
             multisample: MultisampleState {
                 // 1 to disable MSAA
                 count: 1,

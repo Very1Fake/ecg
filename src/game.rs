@@ -4,7 +4,8 @@ use tracing::{debug, debug_span, info};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferUsages, Color, CommandEncoderDescriptor, IndexFormat, LoadOp, Operations,
-    RenderPassColorAttachment, RenderPassDescriptor, SurfaceError, TextureViewDescriptor,
+    RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor,
+    SurfaceError, TextureViewDescriptor,
 };
 use winit::{
     dpi::PhysicalSize,
@@ -18,6 +19,7 @@ use crate::{
     render::{
         pipeline::terrain::TerrainPipeline,
         shader::{MainShader, ShaderStore},
+        texture::Texture,
     },
     scene::camera::{Camera, CameraBind, CameraController},
     types::Float32x3,
@@ -34,6 +36,7 @@ pub struct Game {
     pub terrain_pipeline: TerrainPipeline,
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
+    pub depth_texture: Texture,
 
     // Rendering related
     pub camera: Camera,
@@ -92,6 +95,8 @@ impl Game {
             usage: BufferUsages::INDEX,
         });
 
+        let depth_texture = Texture::new_depth(&graphics.device, &graphics.config, "Depth Texture");
+
         // TODO: Refactor: make more structs
         // TODO: Split `Graphics` new() operations. Leave only low API initialization
         // TODO: Stopped at pipelines. All pipelines has access to all layouts???
@@ -102,6 +107,7 @@ impl Game {
             terrain_pipeline,
             vertex_buffer,
             index_buffer,
+            depth_texture,
             camera,
             camera_controller: CameraController::default(),
             camera_bind,
@@ -197,7 +203,14 @@ impl Game {
                     store: true,
                 },
             })],
-            depth_stencil_attachment: None,
+            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                view: &self.depth_texture.view,
+                depth_ops: Some(Operations {
+                    load: LoadOp::Clear(1.0),
+                    store: true,
+                }),
+                stencil_ops: None,
+            }),
         });
 
         render_pass.set_pipeline(&self.terrain_pipeline.pipeline);

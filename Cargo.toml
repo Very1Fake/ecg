@@ -21,5 +21,6 @@ winit = "0.27"
 
 [profile.final]
 inherits = "release"
+strip = true
 lto = true
 codegen-units = 1

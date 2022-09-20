@@ -18,23 +18,23 @@ impl Vertex {
         // Top point of pyramid
         Self::new(Float32x3::new(0.0, 0.0, 0.0), Float32x3::new(1.0, 1.0, 1.0)),
         // Left near point of pyramid 
-        Self::new(Float32x3::new(-0.5, -0.5, -0.5), Float32x3::new(1.0, 0.0, 0.0)),
+        Self::new(Float32x3::new(-0.5, -0.5, -0.5), Float32x3::new(0.0, 1.0, 0.0)),
         // Left far point of pyramid 
-        Self::new(Float32x3::new(-0.5, -0.5, 0.5), Float32x3::new(0.0, 1.0, 0.0)),
+        Self::new(Float32x3::new(-0.5, -0.5, 0.5), Float32x3::new(0.0, 0.0, 1.0)),
         // Right near point of pyramid 
-        Self::new(Float32x3::new(0.5, -0.5, 0.5), Float32x3::new(0.0, 0.0, 1.0)),
+        Self::new(Float32x3::new(0.5, -0.5, -0.5), Float32x3::new(1.0, 1.0, 0.0)),
         // Right far point of pyramid
         Self::new(Float32x3::new(0.5, -0.5, 0.5), Float32x3::new(1.0, 0.0, 0.0)),
     ];
 
     #[rustfmt::skip]
     pub const INDICES: &'static [u16] = &[
-        0, 1, 3,
-        0, 4, 2,
-        0, 2, 1,
-        0, 3, 4,
-        1, 2, 3,
-        3, 2, 4,
+        0, 1, 3, // Front face
+        0, 4, 2, // Back face
+        0, 2, 1, // Left face
+        0, 3, 4, // Right face
+        1, 2, 3, // First bottom polygon
+        3, 2, 4, // Second bottom polygon
     ];
 
     pub const ATTRS: [VertexAttribute; 2] = vertex_attr_array![0 => Float32x3, 1 => Float32x3];
