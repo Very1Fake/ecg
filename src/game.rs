@@ -3,7 +3,7 @@ use std::{iter::once, time::Instant};
 use tracing::{debug, debug_span, info};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
-    Buffer, BufferUsages, Color, CommandEncoderDescriptor, LoadOp, Operations,
+    Buffer, BufferUsages, Color, CommandEncoderDescriptor, IndexFormat, LoadOp, Operations,
     RenderPassColorAttachment, RenderPassDescriptor, SurfaceError, TextureViewDescriptor,
 };
 use winit::{
@@ -33,6 +33,7 @@ pub struct Game {
     pub shader: ShaderStore,
     pub terrain_pipeline: TerrainPipeline,
     pub vertex_buffer: Buffer,
+    pub index_buffer: Buffer,
 
     // Rendering related
     pub camera: Camera,
@@ -76,12 +77,19 @@ impl Game {
             &shader,
             &[&camera_bind.layout],
         );
-        info!("Creating vertex buffer");
 
+        info!("Creating vertex buffer");
         let vertex_buffer = graphics.device.create_buffer_init(&BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(Vertex::PYRAMID),
             usage: BufferUsages::VERTEX,
+        });
+
+        info!("Creating index buffer");
+        let index_buffer = graphics.device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(Vertex::INDICES),
+            usage: BufferUsages::INDEX,
         });
 
         // TODO: Refactor: make more structs
@@ -93,6 +101,7 @@ impl Game {
             shader,
             terrain_pipeline,
             vertex_buffer,
+            index_buffer,
             camera,
             camera_controller: CameraController::default(),
             camera_bind,
@@ -194,7 +203,8 @@ impl Game {
         render_pass.set_pipeline(&self.terrain_pipeline.pipeline);
         render_pass.set_bind_group(0, &self.camera_bind.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..Vertex::PYRAMID.len() as u32, 0..1);
+        render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
+        render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
 
         drop(render_pass);
 

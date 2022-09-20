@@ -193,27 +193,37 @@ impl Camera {
 
 #[derive(Default, Debug)]
 pub struct CameraController {
-    pub forward: bool,
-    pub backward: bool,
-    pub left: bool,
-    pub right: bool,
+    pub forward: f32,
+    pub backward: f32,
+    pub left: f32,
+    pub right: f32,
+    pub up: f32,
+    pub down: f32,
 }
 
 impl CameraController {
     pub const SPEED: f32 = 2.0;
 
     pub fn update(&mut self, key: VirtualKeyCode, state: ElementState) {
-        let is_pressed = matches!(state, ElementState::Pressed);
+        let force = if matches!(state, ElementState::Pressed) {
+            1.0
+        } else {
+            0.0
+        };
 
         match key {
             // Move forward
-            VirtualKeyCode::W | VirtualKeyCode::Up => self.forward = is_pressed,
+            VirtualKeyCode::W | VirtualKeyCode::Up => self.forward = force,
             // Move left
-            VirtualKeyCode::A | VirtualKeyCode::Left => self.left = is_pressed,
+            VirtualKeyCode::A | VirtualKeyCode::Left => self.left = force,
             // Move backward
-            VirtualKeyCode::S | VirtualKeyCode::Down => self.backward = is_pressed,
+            VirtualKeyCode::S | VirtualKeyCode::Down => self.backward = force,
             // Move right
-            VirtualKeyCode::D | VirtualKeyCode::Right => self.right = is_pressed,
+            VirtualKeyCode::D | VirtualKeyCode::Right => self.right = force,
+            // Move up
+            VirtualKeyCode::Space => self.up = force,
+            // Move down
+            VirtualKeyCode::LShift => self.down = force,
             // Skip other keys
             _ => {}
         }
@@ -232,30 +242,27 @@ impl CameraController {
             CameraMode::ThirdPerson => {
                 let forward = camera.target - camera.position;
                 let forward_norm = forward.normalize();
-                let forward_mag = forward.length();
 
                 // Move forward/backward
-                if self.forward && forward_mag > modifier {
-                    camera.position += forward_norm * modifier;
-                }
-                if self.backward {
-                    camera.position -= forward_norm * modifier;
-                }
+                camera.position += forward_norm
+                    * if forward.length() > modifier {
+                        self.forward - self.backward
+                    } else {
+                        -self.backward
+                    }
+                    * modifier;
 
                 let right = forward_norm.cross(Float32x3::Y);
 
+                // Recalculate in case the forward/backward is pressed
                 let forward = camera.target - camera.position;
-                let forward_mag = forward.length();
 
                 // Move left/right
-                if self.right {
-                    camera.position =
-                        camera.target - (forward + right * modifier).normalize() * forward_mag;
-                }
-                if self.left {
-                    camera.position =
-                        camera.target - (forward - right * modifier).normalize() * forward_mag;
-                }
+                camera.position = camera.target
+                    - (forward + (right * (self.left - self.right)) * modifier).normalize()
+                        * forward.length();
+                
+                camera.position.y += (self.up - self.down) * modifier;
             }
         }
     }
