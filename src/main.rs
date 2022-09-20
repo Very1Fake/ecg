@@ -1,13 +1,17 @@
 pub mod bootstrap;
 pub mod game;
 pub mod graphics;
+pub mod primitives;
+pub mod render;
 pub mod run;
+pub mod scene;
+pub mod types;
 pub mod utils;
 pub mod window;
 
 use anyhow::{Context, Result};
 use tokio::runtime::Builder;
-use tracing::{debug, info};
+use tracing::{debug, debug_span, info, Instrument};
 
 use bootstrap::bootstrap;
 use run::run;
@@ -25,11 +29,15 @@ fn main() -> Result<()> {
         .build()?;
     let window = Window::new().with_context(|| "While creating game window")?;
 
-    debug!("Connecting to GPU");
-    let graphics = runtime.block_on(Graphics::new(&window.inner))?;
+    let graphics = {
+        debug!("Opening GPU instance");
+        runtime.block_on(Graphics::new(&window.inner).instrument(debug_span!("graphics_init")))?
+    };
+
+    let game = Game::new(&window, graphics);
 
     debug!("Game starts");
-    runtime.block_on(run(window, Game::new(graphics)));
+    runtime.block_on(run(window, game));
 
     Ok(())
 }

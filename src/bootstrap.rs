@@ -1,7 +1,6 @@
 use std::env::var;
 
 use thiserror::Error;
-use tracing::Level;
 use tracing_subscriber::fmt::fmt;
 
 #[derive(Error, Debug)]
@@ -12,22 +11,21 @@ pub enum BootstrapError {
 
 pub fn bootstrap() -> Result<(), BootstrapError> {
     fmt()
-        .with_max_level({
+        .with_env_filter(format!(
+            "{},wgpu_core=info",
             match var("LOG_LEVEL") {
-                Ok(level) => match level.to_lowercase().as_str() {
-                    "trace" => Level::TRACE,
-                    "debug" => Level::DEBUG,
-                    "info" => Level::INFO,
-                    "warn" => Level::WARN,
-                    "error" => Level::ERROR,
-                    _ => return Err(BootstrapError::LogLevelError(Some(level))),
-                },
+                Ok(level) => {
+                    match level.to_lowercase().as_str() {
+                        "trace" | "debug" | "info" | "warn" | "error" => level,
+                        _ => return Err(BootstrapError::LogLevelError(Some(level))),
+                    }
+                }
                 #[cfg(debug_assertions)]
-                Err(_) => Level::DEBUG,
+                Err(_) => String::from("trace"),
                 #[cfg(not(debug_assertions))]
-                Err(_) => Level::INFO,
+                Err(_) => String::from("info"),
             }
-        })
+        ))
         .init();
 
     Ok(())
