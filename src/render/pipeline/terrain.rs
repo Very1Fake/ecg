@@ -1,11 +1,15 @@
 use wgpu::{
     BindGroupLayout, BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType,
-    ColorTargetState, ColorWrites, Device, Face, FragmentState, FrontFace, MultisampleState,
-    PipelineLayout, PipelineLayoutDescriptor, PolygonMode, PrimitiveState, PrimitiveTopology,
-    RenderPipeline, RenderPipelineDescriptor, ShaderStages, SurfaceConfiguration, VertexState, DepthStencilState, CompareFunction, StencilState, DepthBiasState,
+    ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device,
+    Face, FragmentState, FrontFace, MultisampleState, PipelineLayout, PipelineLayoutDescriptor,
+    PolygonMode, PrimitiveState, PrimitiveTopology, RenderPipeline, RenderPipelineDescriptor,
+    ShaderStages, StencilState, SurfaceConfiguration, VertexState,
 };
 
-use crate::{primitives::vertex::Vertex, render::{shader::ShaderStore, texture::Texture}};
+use crate::{
+    primitives::vertex::Vertex,
+    render::{shader::ShaderStore, texture::Texture},
+};
 
 pub struct TerrainPipeline {
     pub pipeline: RenderPipeline,

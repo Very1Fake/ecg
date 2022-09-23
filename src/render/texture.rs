@@ -1,7 +1,8 @@
-use tracing::{debug_span, debug};
+use tracing::{debug, debug_span};
 use wgpu::{
-    Device, Extent3d, Sampler, SurfaceConfiguration, Texture as WTexture, TextureFormat,
-    TextureView, TextureDescriptor, TextureDimension, TextureUsages, TextureViewDescriptor, SamplerDescriptor, CompareFunction, AddressMode, FilterMode,
+    AddressMode, CompareFunction, Device, Extent3d, FilterMode, Sampler, SamplerDescriptor,
+    SurfaceConfiguration, Texture as WTexture, TextureDescriptor, TextureDimension, TextureFormat,
+    TextureUsages, TextureView, TextureViewDescriptor,
 };
 
 /// Represents image that has been uploaded to the GPU
@@ -25,7 +26,7 @@ impl Texture {
             depth_or_array_layers: 1,
         };
 
-        debug!(texture=label, "Creating new depth texture");
+        debug!(texture = label, "Creating new depth texture");
         let texture = device.create_texture(&TextureDescriptor {
             label: Some(label),
             size,
@@ -38,7 +39,7 @@ impl Texture {
 
         let view = texture.create_view(&TextureViewDescriptor::default());
 
-        debug!(texture=label, "Creating new sampler");
+        debug!(texture = label, "Creating new sampler");
         let sampler = device.create_sampler(&SamplerDescriptor {
             label: None,
             address_mode_u: AddressMode::ClampToEdge,

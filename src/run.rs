@@ -19,7 +19,9 @@ pub async fn run(window: Window, mut game: Game) {
                 info!("Closing game!");
                 control_flow.set_exit_with_code(ExitCode::Ok.as_int());
             }
-            Event::WindowEvent { event, .. } => game.input(event, control_flow),
+            Event::WindowEvent { .. } | Event::DeviceEvent { .. } => {
+                game.input(event, control_flow)
+            }
             Event::MainEventsCleared => {
                 window.inner.request_redraw();
             }

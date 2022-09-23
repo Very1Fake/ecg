@@ -1,6 +1,6 @@
 use std::{iter::once, time::Instant};
 
-use tracing::{debug, debug_span, info};
+use tracing::{debug_span, info};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferUsages, Color, CommandEncoderDescriptor, IndexFormat, LoadOp, Operations,
@@ -9,7 +9,7 @@ use wgpu::{
 };
 use winit::{
     dpi::PhysicalSize,
-    event::{ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
 };
 
@@ -119,35 +119,56 @@ impl Game {
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
         self.graphics.resize(size);
         self.camera.proj_resize(size.width, size.height);
+
+        // Recreate depth texture with new surface size
+        self.depth_texture = Texture::new_depth(
+            &self.graphics.device,
+            &self.graphics.config,
+            "Depth Texture",
+        );
     }
 
-    pub fn input(&mut self, event: WindowEvent, control_flow: &mut ControlFlow) {
+    pub fn input(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
         match event {
-            WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
-                        virtual_keycode: Some(key),
-                        state,
-                        ..
-                    },
+            Event::WindowEvent {
+                event: window_event,
+                ..
+            } => match window_event {
+                WindowEvent::KeyboardInput {
+                    input:
+                        KeyboardInput {
+                            virtual_keycode: Some(key),
+                            state,
+                            ..
+                        },
+                    ..
+                } => {
+                    match key {
+                        // Close game
+                        VirtualKeyCode::Escape if matches!(state, ElementState::Released) => {
+                            control_flow.set_exit()
+                        }
+                        _ => {}
+                    }
+
+                    self.camera_controller.virtual_key(key, state);
+                }
+                WindowEvent::Resized(size) => self.resize(size),
+                WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                    self.graphics.resize(*new_inner_size)
+                }
+                WindowEvent::MouseWheel { delta, .. } => self.camera_controller.mouse_wheel(delta),
+                _ => {}
+            },
+            // FIX: Abnormal touchpad sensitivity
+            // Mouse motion extracted from DeviceEvent to avoid
+            // OS transformations (e.g. cursor acceleration)
+            Event::DeviceEvent {
+                event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                match key {
-                    // Close game
-                    VirtualKeyCode::Escape if matches!(state, ElementState::Released) => {
-                        control_flow.set_exit()
-                    }
-                    // Log other key presses
-                    _ => debug!("Key pressed: {key:?}"),
-                }
-
-                self.camera_controller.update(key, state);
+                self.camera_controller.mouse_move(delta);
             }
-            WindowEvent::Resized(size) => self.resize(size),
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                self.graphics.resize(*new_inner_size)
-            }
-            // WindowEvent::CursorMoved { position, .. } => debug!("Cursor move: {position:?}"),
             _ => {}
         }
     }

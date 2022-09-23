@@ -7,7 +7,7 @@ use wgpu::{
     BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferUsages, Device, Queue,
     ShaderStages,
 };
-use winit::event::{ElementState, VirtualKeyCode};
+use winit::event::{ElementState, MouseScrollDelta, VirtualKeyCode};
 
 use crate::types::{Float32x3, Matrix4, Rad, RawMatrix4};
 
@@ -191,7 +191,7 @@ impl Camera {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct CameraController {
     pub forward: f32,
     pub backward: f32,
@@ -199,12 +199,18 @@ pub struct CameraController {
     pub right: f32,
     pub up: f32,
     pub down: f32,
+    pub horizontal: f32,
+    pub vertical: f32,
+    pub zoom: f32,
+    pub sensitivity: f32,
 }
 
 impl CameraController {
     pub const SPEED: f32 = 2.0;
+    pub const SCROLL_SENSITIVITY: f32 = 0.5;
+    pub const MIN_DISTANCE: f32 = 0.5;
 
-    pub fn update(&mut self, key: VirtualKeyCode, state: ElementState) {
+    pub fn virtual_key(&mut self, key: VirtualKeyCode, state: ElementState) {
         let force = if matches!(state, ElementState::Pressed) {
             1.0
         } else {
@@ -229,7 +235,22 @@ impl CameraController {
         }
     }
 
-    pub fn update_camera(&self, camera: &mut Camera, duration: Duration) {
+    pub fn mouse_move(&mut self, delta: (f64, f64)) {
+        // Yaw angle
+        self.horizontal = delta.0 as f32;
+        // Pitch angle
+        self.vertical = delta.1 as f32;
+    }
+
+    pub fn mouse_wheel(&mut self, delta: MouseScrollDelta) {
+        self.zoom = match delta {
+            // Assume 1 line is 10 pixels
+            MouseScrollDelta::LineDelta(_, y) => y * 10.0 * Self::SCROLL_SENSITIVITY,
+            MouseScrollDelta::PixelDelta(position) => position.y as f32,
+        };
+    }
+
+    pub fn update_camera(&mut self, camera: &mut Camera, duration: Duration) {
         let duration = duration.as_secs_f32();
         let modifier = Self::SPEED * duration;
 
@@ -242,28 +263,63 @@ impl CameraController {
             CameraMode::ThirdPerson => {
                 let forward = camera.target - camera.position;
                 let forward_norm = forward.normalize();
+                let forward_length = forward.length();
 
                 // Move forward/backward
-                camera.position += forward_norm
-                    * if forward.length() > modifier {
-                        self.forward - self.backward
-                    } else {
-                        -self.backward
-                    }
-                    * modifier;
+                {
+                    let new = (self.zoom * forward_length * 0.75) * modifier;
 
-                let right = forward_norm.cross(Float32x3::Y);
+                    if forward_length - new > Self::MIN_DISTANCE {
+                        camera.position += forward_norm * new;
+                    } else {
+                        camera.position =
+                            forward_norm.clamp_length(Self::MIN_DISTANCE, Self::MIN_DISTANCE);
+                    }
+                }
 
                 // Recalculate in case the forward/backward is pressed
-                let forward = camera.target - camera.position;
+                let forward_length = (camera.target - camera.position).length();
+                let right = forward_norm.cross(Float32x3::Y);
+                let up = right.cross(forward_norm).normalize();
 
                 // Move left/right
                 camera.position = camera.target
-                    - (forward + (right * (self.left - self.right)) * modifier).normalize()
-                        * forward.length();
-                
-                camera.position.y += (self.up - self.down) * modifier;
+                    - (forward_norm + (right * self.horizontal) * modifier * self.sensitivity)
+                        .normalize()
+                        * forward_length;
+
+                // Recalculate in case the left/right is pressed
+                let forward_norm = (camera.target - camera.position).normalize();
+
+                // Move up/down
+                // TODO: Check for stability
+                camera.position = camera.target
+                    - (forward_norm + (up * -self.vertical) * modifier * self.sensitivity)
+                        .normalize()
+                        * forward_length;
+
+                // Reset mouse inputs
+                self.zoom = 0.0;
+                self.horizontal = 0.0;
+                self.vertical = 0.0;
             }
+        }
+    }
+}
+
+impl Default for CameraController {
+    fn default() -> Self {
+        Self {
+            forward: 0.0,
+            backward: 0.0,
+            left: 0.0,
+            right: 0.0,
+            up: 0.0,
+            down: 0.0,
+            horizontal: 0.0,
+            vertical: 0.0,
+            zoom: 0.0,
+            sensitivity: 1.5,
         }
     }
 }
