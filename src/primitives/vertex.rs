@@ -3,7 +3,7 @@ use std::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::types::Float32x3;
+use crate::{types::Float32x3, test_buffer_align};
 
 #[repr(C)]
 #[derive(Pod, Zeroable, Copy, Clone, Debug)]
@@ -11,6 +11,8 @@ pub struct Vertex {
     pub position: Float32x3,
     pub color: Float32x3,
 }
+
+test_buffer_align!(Vertex);
 
 impl Vertex {
     #[rustfmt::skip]

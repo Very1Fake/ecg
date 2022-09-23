@@ -22,3 +22,19 @@ impl ExitCode {
         *self as i32
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Testing
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Buffers should be 8 byte aligned
+#[macro_export]
+macro_rules! test_buffer_align {
+    ($test_type:ty) => {
+        #[cfg(test)]
+        #[test]
+        fn test_alignment() {
+            assert_eq!(core::mem::size_of::<$test_type>() % 8, 0);
+        }
+    };
+}
