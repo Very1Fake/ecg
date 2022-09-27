@@ -136,7 +136,7 @@ impl Camera {
         Self {
             position,
             target,
-            aspect: height as f32 / width as f32,
+            aspect: width as f32 / height as f32,
             mode: CameraMode::ThirdPerson,
             fov,
             near,
@@ -146,7 +146,7 @@ impl Camera {
 
     /// Resize projection
     pub fn proj_resize(&mut self, width: u32, height: u32) {
-        self.aspect = height as f32 / width as f32;
+        self.aspect = width as f32 / height as f32;
     }
 
     /// Calculate projection matrix
