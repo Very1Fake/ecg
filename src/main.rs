@@ -1,7 +1,6 @@
 pub mod bootstrap;
 pub mod game;
 pub mod graphics;
-pub mod primitives;
 pub mod render;
 pub mod run;
 pub mod scene;

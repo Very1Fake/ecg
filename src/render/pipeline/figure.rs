@@ -6,14 +6,18 @@ use wgpu::{
     ShaderStages, StencilState, SurfaceConfiguration, VertexState,
 };
 
-use crate::render::{primitives::vertex::Vertex, shader::ShaderStore, texture::Texture};
+use crate::render::{
+    primitives::{instance::RawInstance, vertex::Vertex},
+    shader::ShaderStore,
+    texture::Texture,
+};
 
-pub struct TerrainPipeline {
+pub struct FigurePipeline {
     pub pipeline: RenderPipeline,
     pub layout: PipelineLayout,
 }
 
-impl TerrainPipeline {
+impl FigurePipeline {
     pub const LAYOUT: BindGroupLayoutEntry = BindGroupLayoutEntry {
         binding: 0,
         visibility: ShaderStages::VERTEX,
@@ -32,19 +36,19 @@ impl TerrainPipeline {
         bind_layouts: &'a [&'a BindGroupLayout],
     ) -> Self {
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
-            label: Some("PipelineLayout: Terrain"),
+            label: Some("PipelineLayout: Figure"),
             bind_group_layouts: bind_layouts,
             push_constant_ranges: &[],
         });
 
         let pipeline = device.create_render_pipeline(&RenderPipelineDescriptor {
-            label: Some("RenderPipeline: Terrain"),
+            label: Some("RenderPipeline: Figure"),
             layout: Some(&layout),
             // Vertex shader entry point
             vertex: VertexState {
                 module: &shader.0,
                 entry_point: "vs_main",
-                buffers: &[Vertex::LAYOUT],
+                buffers: &[Vertex::LAYOUT, RawInstance::LAYOUT],
             },
             // Properties of pipeline at primitives assembly and rasterization
             primitive: PrimitiveState {

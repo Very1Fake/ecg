@@ -1,5 +1,6 @@
 use std::{iter::once, time::Instant};
 
+use bytemuck::cast_slice;
 use tracing::{debug_span, info};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
@@ -15,14 +16,18 @@ use winit::{
 
 use crate::{
     graphics::Graphics,
-    primitives::vertex::Vertex,
     render::{
-        pipeline::terrain::TerrainPipeline,
-        shader::{MainShader, ShaderStore},
+        model::DrawModel,
+        pipeline::{figure::FigurePipeline, terrain::TerrainPipeline},
+        primitives::{instance::Instance, vertex::Vertex},
+        shader::{FigureShader, ShaderStore, TerrainShader},
         texture::Texture,
     },
-    scene::camera::{Camera, CameraBind, CameraController},
-    types::Float32x3,
+    scene::{
+        camera::{Camera, CameraBind, CameraController},
+        figure::voxel::Voxel,
+    },
+    types::{Float32x3, Rotation},
     window::Window,
 };
 
@@ -32,16 +37,22 @@ pub struct Game {
     pub graphics: Graphics,
 
     // WGPU related
-    pub shader: ShaderStore,
+    pub shaders: (ShaderStore, ShaderStore),
     pub terrain_pipeline: TerrainPipeline,
+    pub figure_pipeline: FigurePipeline,
     pub vertex_buffer: Buffer,
     pub index_buffer: Buffer,
+    pub instance_buffer: Buffer,
     pub depth_texture: Texture,
 
     // Rendering related
     pub camera: Camera,
     pub camera_controller: CameraController,
     pub camera_bind: CameraBind,
+
+    // Objects
+    pub voxel: Voxel,
+    pub voxel_instance: Instance,
 
     // In-game related
     pub last_tick: Instant,
@@ -69,15 +80,31 @@ impl Game {
         info!("Creating camera binds");
         let camera_bind = CameraBind::new(&graphics.device, &camera);
 
-        info!("Loading shader module");
         // Shader hardcoded to game binary
-        let shader = ShaderStore::new::<MainShader>(&graphics.device);
+        let shaders = {
+            info!("Loading terrain shader module");
+            let terrain = ShaderStore::new::<TerrainShader>(&graphics.device);
+            info!("Loading figure shader module");
+            let figure = ShaderStore::new::<FigureShader>(&graphics.device);
+            (terrain, figure)
+        };
+
+        let voxel_instance = Instance::new(Float32x3::ZERO, Rotation::IDENTITY);
 
         info!("Creating terrain pipeline");
         let terrain_pipeline = TerrainPipeline::new(
             &graphics.device,
             &graphics.config,
-            &shader,
+            &shaders.0,
+            &[&camera_bind.layout],
+        );
+
+        // TODO: Make container for buffers
+        info!("Creating figure pipeline");
+        let figure_pipeline = FigurePipeline::new(
+            &graphics.device,
+            &graphics.config,
+            &shaders.1,
             &[&camera_bind.layout],
         );
 
@@ -95,7 +122,16 @@ impl Game {
             usage: BufferUsages::INDEX,
         });
 
+        info!("Creating instance buffer");
+        let instance_buffer = graphics.device.create_buffer_init(&BufferInitDescriptor {
+            label: Some("Primary instance buffer"),
+            contents: bytemuck::cast_slice(&[voxel_instance.as_raw()]),
+            usage: BufferUsages::VERTEX | BufferUsages::COPY_DST,
+        });
+
         let depth_texture = Texture::new_depth(&graphics.device, &graphics.config, "Depth Texture");
+
+        let voxel = Voxel::new(&graphics.device);
 
         // TODO: Refactor: make more structs
         // TODO: Split `Graphics` new() operations. Leave only low API initialization
@@ -103,14 +139,18 @@ impl Game {
 
         Self {
             graphics,
-            shader,
+            shaders,
             terrain_pipeline,
+            figure_pipeline,
             vertex_buffer,
             index_buffer,
+            instance_buffer,
             depth_texture,
             camera,
             camera_controller: CameraController::default(),
             camera_bind,
+            voxel,
+            voxel_instance,
             last_tick: Instant::now(),
         }
     }
@@ -185,6 +225,14 @@ impl Game {
             .update_camera(&mut self.camera, tick_dur);
         self.camera_bind
             .update_buffer(&self.graphics.queue, &self.camera.uniform());
+
+        // Update voxel instance position
+        self.voxel_instance.position = self.camera.target;
+        self.graphics.queue.write_buffer(
+            &self.instance_buffer,
+            0,
+            cast_slice(&[self.voxel_instance.as_raw()]),
+        );
     }
 
     pub fn render(&self) -> Result<(), SurfaceError> {
@@ -234,11 +282,17 @@ impl Game {
             }),
         });
 
+        // Draw "terrain"
         render_pass.set_pipeline(&self.terrain_pipeline.pipeline);
         render_pass.set_bind_group(0, &self.camera_bind.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
         render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
+
+        // Draw figures
+        render_pass.set_pipeline(&self.figure_pipeline.pipeline);
+        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+        render_pass.draw_model(&self.voxel, &self.camera_bind);
 
         drop(render_pass);
 

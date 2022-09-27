@@ -17,13 +17,24 @@ impl ShaderStore {
     }
 }
 
-pub struct MainShader;
+pub struct TerrainShader;
 
-impl Shader for MainShader {
+impl Shader for TerrainShader {
     const DESCRIPTOR: ShaderModuleDescriptor<'static> = ShaderModuleDescriptor {
         label: Some("Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-            "../../assets/shaders/shader.wgsl"
+            "../../assets/shaders/terrain.wgsl"
+        ))),
+    };
+}
+
+pub struct FigureShader;
+
+impl Shader for FigureShader {
+    const DESCRIPTOR: ShaderModuleDescriptor<'static> = ShaderModuleDescriptor {
+        label: Some("Shader"),
+        source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
+            "../../assets/shaders/figure.wgsl"
         ))),
     };
 }

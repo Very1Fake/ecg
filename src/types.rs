@@ -1,7 +1,4 @@
-use glam::{
-    f32::{Mat4, Vec3},
-    Vec4,
-};
+use glam::f32::{Mat4, Quat, Vec3, Vec4};
 
 // Graphics related types
 
@@ -12,6 +9,7 @@ pub type Matrix4 = Mat4;
 pub type RawMatrix4 = [[f32; 4]; 4];
 
 pub type Rad = f32;
+pub type Rotation = Quat;
 
 // World related types
 

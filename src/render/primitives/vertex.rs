@@ -3,8 +3,10 @@ use std::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::{types::Float32x3, test_buffer_align};
+use crate::{test_buffer_align, types::Float32x3};
 
+// TODO: Make separate vertex structs for each pipeline
+/// Represents vertex data sent to vertex buffer
 #[repr(C)]
 #[derive(Pod, Zeroable, Copy, Clone, Debug)]
 pub struct Vertex {
@@ -41,16 +43,14 @@ impl Vertex {
 
     pub const ATTRS: [VertexAttribute; 2] = vertex_attr_array![0 => Float32x3, 1 => Float32x3];
 
+    pub const LAYOUT: VertexBufferLayout<'static> = VertexBufferLayout {
+        array_stride: size_of::<Self>() as BufferAddress,
+        step_mode: VertexStepMode::Vertex,
+        attributes: &Self::ATTRS,
+    };
+
     #[inline]
     pub const fn new(position: Float32x3, color: Float32x3) -> Self {
         Self { position, color }
-    }
-
-    pub fn layout<'a>() -> VertexBufferLayout<'a> {
-        VertexBufferLayout {
-            array_stride: size_of::<Self>() as BufferAddress,
-            step_mode: VertexStepMode::Vertex,
-            attributes: &Self::ATTRS,
-        }
     }
 }
