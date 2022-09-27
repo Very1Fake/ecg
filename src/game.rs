@@ -70,6 +70,8 @@ impl Game {
             Camera::new(
                 Float32x3::new(0.0, 0.5, 5.0),
                 Float32x3::ZERO,
+                -90.0,
+                15.0,
                 size.width,
                 size.height,
                 45.0,

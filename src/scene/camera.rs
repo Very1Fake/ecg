@@ -98,8 +98,17 @@ impl CameraBind {
 /// Represents camera mode
 #[derive(Debug)]
 pub enum CameraMode {
-    ThirdPerson,
+    ThirdPerson {
+        // Distance between camera and target
+        distance: f32,
+    },
     // TODO: ThirdPerson
+}
+
+impl Default for CameraMode {
+    fn default() -> Self {
+        Self::ThirdPerson { distance: 2.5 }
+    }
 }
 
 /// Represents camera and its dependents state
@@ -109,6 +118,9 @@ pub struct Camera {
     pub position: Float32x3,
     /// Position of the target
     pub target: Float32x3,
+
+    yaw: f32,
+    pitch: f32,
 
     /// Camera mode
     pub mode: CameraMode,
@@ -124,9 +136,14 @@ pub struct Camera {
 }
 
 impl Camera {
+    // TODO: Split camera and player controllers
     pub fn new(
         position: Float32x3,
         target: Float32x3,
+        // Pass as degrees
+        yaw: f32,
+        // Pass as degrees
+        pitch: f32,
         width: u32,
         height: u32,
         fov: Rad,
@@ -136,8 +153,10 @@ impl Camera {
         Self {
             position,
             target,
+            yaw: yaw.to_radians(),
+            pitch: pitch.to_radians(),
             aspect: width as f32 / height as f32,
-            mode: CameraMode::ThirdPerson,
+            mode: CameraMode::default(),
             fov,
             near,
             far,
@@ -161,7 +180,7 @@ impl Camera {
     /// Camera view matrix moves the world to be at the position and rotation of the camera
     pub fn camera_mat(&self) -> Matrix4 {
         match self.mode {
-            CameraMode::ThirdPerson => {
+            CameraMode::ThirdPerson { .. } => {
                 Matrix4::look_at_rh(self.position, self.target, Float32x3::Y)
             }
         }
@@ -209,6 +228,7 @@ impl CameraController {
     pub const SPEED: f32 = 2.0;
     pub const SCROLL_SENSITIVITY: f32 = 0.5;
     pub const MIN_DISTANCE: f32 = 0.5;
+    pub const SAFE_PITCH: f32 = std::f32::consts::FRAC_2_PI;
 
     pub fn virtual_key(&mut self, key: VirtualKeyCode, state: ElementState) {
         let force = if matches!(state, ElementState::Pressed) {
@@ -254,49 +274,60 @@ impl CameraController {
         let duration = duration.as_secs_f32();
         let modifier = Self::SPEED * duration;
 
-        // For first person camera
-        // let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
-        // let forward = Float32x3::new(yaw_cos, 0.0, yaw_sin).normalize();
-        // let right = Float32x3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+        match &mut camera.mode {
+            CameraMode::ThirdPerson { distance } => {
+                // Target forward/right vector
+                let (forward, right, length) = {
+                    let forward = camera.target - camera.position;
+                    let right = forward.normalize().cross(Float32x3::Y);
 
-        match camera.mode {
-            CameraMode::ThirdPerson => {
-                let forward = camera.target - camera.position;
-                let forward_norm = forward.normalize();
-                let forward_length = forward.length();
+                    (Float32x3::Y.cross(right), right, forward.length())
+                };
 
-                // Move forward/backward
+                // Zoom in/out
                 {
-                    let new = (self.zoom * forward_length * 0.75) * modifier;
+                    let new = -((self.zoom * length * 0.75) * modifier);
 
-                    if forward_length - new > Self::MIN_DISTANCE {
-                        camera.position += forward_norm * new;
+                    if *distance + new > Self::MIN_DISTANCE {
+                        *distance += new;
                     } else {
-                        camera.position =
-                            forward_norm.clamp_length(Self::MIN_DISTANCE, Self::MIN_DISTANCE);
+                        *distance = Self::MIN_DISTANCE;
                     }
                 }
 
-                // Recalculate in case the forward/backward is pressed
-                let forward_length = (camera.target - camera.position).length();
-                let right = forward_norm.cross(Float32x3::Y);
-                let up = right.cross(forward_norm).normalize();
-
+                // Move forward/backward
+                camera.target += forward * (self.forward - self.backward) * modifier;
                 // Move left/right
-                camera.position = camera.target
-                    - (forward_norm + (right * self.horizontal) * modifier * self.sensitivity)
-                        .normalize()
-                        * forward_length;
-
-                // Recalculate in case the left/right is pressed
-                let forward_norm = (camera.target - camera.position).normalize();
-
+                camera.target += right * (self.right - self.left) * modifier;
                 // Move up/down
-                // TODO: Check for stability
-                camera.position = camera.target
-                    - (forward_norm + (up * -self.vertical) * modifier * self.sensitivity)
-                        .normalize()
-                        * forward_length;
+                camera.target.y += (self.up - self.down) * modifier;
+
+                // Rotate camera
+                camera.yaw -= self.horizontal.to_radians() * self.sensitivity * modifier;
+                camera.pitch += self.vertical.to_radians() * self.sensitivity * modifier;
+
+                // Pitch angle safety
+                if camera.pitch < -Self::SAFE_PITCH {
+                    camera.pitch = -Self::SAFE_PITCH;
+                } else if camera.pitch > Self::SAFE_PITCH {
+                    camera.pitch = Self::SAFE_PITCH;
+                }
+
+                // Calculate camera position
+                {
+                    let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
+                    let (pitch_sin, pitch_cos) = camera.pitch.sin_cos();
+
+                    let hor_dist = *distance * pitch_cos;
+                    let vert_dist = *distance * pitch_sin;
+
+                    let offset_x = hor_dist * yaw_sin;
+                    let offset_z = hor_dist * yaw_cos;
+
+                    camera.position.x = camera.target.x - offset_x;
+                    camera.position.z = camera.target.z - offset_z;
+                    camera.position.y = camera.target.y + vert_dist;
+                }
 
                 // Reset mouse inputs
                 self.zoom = 0.0;
@@ -319,7 +350,7 @@ impl Default for CameraController {
             horizontal: 0.0,
             vertical: 0.0,
             zoom: 0.0,
-            sensitivity: 1.5,
+            sensitivity: 150.0,
         }
     }
 }
