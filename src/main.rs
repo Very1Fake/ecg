@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 pub mod bootstrap;
 pub mod game;
 pub mod graphics;
