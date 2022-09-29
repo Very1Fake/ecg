@@ -12,6 +12,16 @@ pub struct Quad {
 }
 
 impl Quad {
+    pub const LEFT_UP_FRONT: Float32x3 = Float32x3::new(-HALF_SIZE, HALF_SIZE, -HALF_SIZE);
+    pub const LEFT_UP_BACK: Float32x3 = Float32x3::new(-HALF_SIZE, HALF_SIZE, HALF_SIZE);
+    pub const LEFT_DOWN_FRONT: Float32x3 = Float32x3::new(-HALF_SIZE, -HALF_SIZE, -HALF_SIZE);
+    pub const LEFT_DOWN_BACK: Float32x3 = Float32x3::new(-HALF_SIZE, -HALF_SIZE, HALF_SIZE);
+
+    pub const RIGHT_UP_FRONT: Float32x3 = Float32x3::new(HALF_SIZE, HALF_SIZE, -HALF_SIZE);
+    pub const RIGHT_UP_BACK: Float32x3 = Float32x3::new(HALF_SIZE, HALF_SIZE, HALF_SIZE);
+    pub const RIGHT_DOWN_FRONT: Float32x3 = Float32x3::new(HALF_SIZE, -HALF_SIZE, -HALF_SIZE);
+    pub const RIGHT_DOWN_BACK: Float32x3 = Float32x3::new(HALF_SIZE, -HALF_SIZE, HALF_SIZE);
+
     pub fn new(direction: Direction, position: Float32x3) -> Self {
         Self {
             direction,
@@ -25,64 +35,40 @@ impl Quad {
 
         match self.direction {
             Direction::Up => [
-                // Left Up Back
-                Float32x3::new(pos.x - HALF_SIZE, pos.y + HALF_SIZE, pos.z + HALF_SIZE),
-                // Left Up Front
-                Float32x3::new(pos.x - HALF_SIZE, pos.y + HALF_SIZE, pos.z - HALF_SIZE),
-                // Right Up Front
-                Float32x3::new(pos.x + HALF_SIZE, pos.y + HALF_SIZE, pos.z - HALF_SIZE),
-                // Right Up Back
-                Float32x3::new(pos.x + HALF_SIZE, pos.y + HALF_SIZE, pos.z + HALF_SIZE),
+                Self::RIGHT_UP_BACK + pos,
+                Self::RIGHT_UP_FRONT + pos,
+                Self::LEFT_UP_FRONT + pos,
+                Self::LEFT_UP_BACK + pos,
             ],
             Direction::Down => [
-                // Left Down Front
-                Float32x3::new(pos.x - HALF_SIZE, pos.y - HALF_SIZE, pos.z - HALF_SIZE),
-                // Left Down Back
-                Float32x3::new(pos.x - HALF_SIZE, pos.y - HALF_SIZE, pos.z + HALF_SIZE),
-                // Right Down Back
-                Float32x3::new(pos.x + HALF_SIZE, pos.y - HALF_SIZE, pos.z + HALF_SIZE),
-                // Right Down Front
-                Float32x3::new(pos.x + HALF_SIZE, pos.y - HALF_SIZE, pos.z - HALF_SIZE),
+                Self::RIGHT_DOWN_FRONT + pos,
+                Self::RIGHT_DOWN_BACK + pos,
+                Self::LEFT_DOWN_BACK + pos,
+                Self::LEFT_DOWN_FRONT + pos,
             ],
             Direction::Left => [
-                // Left Up Back
-                Float32x3::new(pos.x - HALF_SIZE, pos.y + HALF_SIZE, pos.z + HALF_SIZE),
-                // Left Down Back
-                Float32x3::new(pos.x - HALF_SIZE, pos.y - HALF_SIZE, pos.z + HALF_SIZE),
-                // Left Down Front
-                Float32x3::new(pos.x - HALF_SIZE, pos.y - HALF_SIZE, pos.z - HALF_SIZE),
-                // Left Up Front
-                Float32x3::new(pos.x - HALF_SIZE, pos.y + HALF_SIZE, pos.z - HALF_SIZE),
+                Self::LEFT_UP_FRONT + pos,
+                Self::LEFT_DOWN_FRONT + pos,
+                Self::LEFT_DOWN_BACK + pos,
+                Self::LEFT_UP_BACK + pos,
             ],
             Direction::Right => [
-                // Right Up Front
-                Float32x3::new(pos.x + HALF_SIZE, pos.y + HALF_SIZE, pos.z - HALF_SIZE),
-                // Right Down Front
-                Float32x3::new(pos.x + HALF_SIZE, pos.y - HALF_SIZE, pos.z - HALF_SIZE),
-                // Right Down Back
-                Float32x3::new(pos.x + HALF_SIZE, pos.y - HALF_SIZE, pos.z + HALF_SIZE),
-                // Right Up Back
-                Float32x3::new(pos.x + HALF_SIZE, pos.y + HALF_SIZE, pos.z + HALF_SIZE),
+                Self::RIGHT_UP_BACK + pos,
+                Self::RIGHT_DOWN_BACK + pos,
+                Self::RIGHT_DOWN_FRONT + pos,
+                Self::RIGHT_UP_FRONT + pos,
             ],
             Direction::Front => [
-                // Left Up Front
-                Float32x3::new(pos.x - HALF_SIZE, pos.y + HALF_SIZE, pos.z - HALF_SIZE),
-                // Left Down Front
-                Float32x3::new(pos.x - HALF_SIZE, pos.y - HALF_SIZE, pos.z - HALF_SIZE),
-                // Right Down Front
-                Float32x3::new(pos.x + HALF_SIZE, pos.y - HALF_SIZE, pos.z - HALF_SIZE),
-                // Right Up Front
-                Float32x3::new(pos.x + HALF_SIZE, pos.y + HALF_SIZE, pos.z - HALF_SIZE),
+                Self::RIGHT_UP_FRONT + pos,
+                Self::RIGHT_DOWN_FRONT + pos,
+                Self::LEFT_DOWN_FRONT + pos,
+                Self::LEFT_UP_FRONT + pos,
             ],
             Direction::Back => [
-                // Right Up Back
-                Float32x3::new(pos.x + HALF_SIZE, pos.y + HALF_SIZE, pos.z + HALF_SIZE),
-                // Right Down Back
-                Float32x3::new(pos.x + HALF_SIZE, pos.y - HALF_SIZE, pos.z + HALF_SIZE),
-                // Left Down Back
-                Float32x3::new(pos.x - HALF_SIZE, pos.y - HALF_SIZE, pos.z + HALF_SIZE),
-                // Left Up Back
-                Float32x3::new(pos.x - HALF_SIZE, pos.y + HALF_SIZE, pos.z + HALF_SIZE),
+                Self::LEFT_UP_BACK + pos,
+                Self::LEFT_DOWN_BACK + pos,
+                Self::RIGHT_DOWN_BACK + pos,
+                Self::RIGHT_UP_BACK + pos,
             ],
         }
     }

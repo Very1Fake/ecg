@@ -98,11 +98,11 @@ impl CameraBind {
 /// Represents camera mode
 #[derive(Debug)]
 pub enum CameraMode {
+    // TODO: FirstPerson
     ThirdPerson {
         // Distance between camera and target
         distance: f32,
     },
-    // TODO: ThirdPerson
 }
 
 impl Default for CameraMode {
@@ -172,7 +172,7 @@ impl Camera {
     ///
     /// Projection matrix warps the scene to give the effect of depth
     pub fn proj_mat(&self) -> Matrix4 {
-        Matrix4::perspective_rh(self.fov, self.aspect, self.near, self.far)
+        Matrix4::perspective_lh(self.fov, self.aspect, self.near, self.far)
     }
 
     /// Calculate camera view matrix
@@ -181,7 +181,7 @@ impl Camera {
     pub fn camera_mat(&self) -> Matrix4 {
         match self.mode {
             CameraMode::ThirdPerson { .. } => {
-                Matrix4::look_at_rh(self.position, self.target, Float32x3::Y)
+                Matrix4::look_at_lh(self.position, self.target, Float32x3::Y)
             }
         }
 
@@ -314,12 +314,12 @@ impl CameraController {
                 // Move forward/backward
                 camera.target += forward * (self.forward - self.backward) * modifier;
                 // Move left/right
-                camera.target += right * (self.right - self.left) * modifier;
+                camera.target += right * (self.left - self.right) * modifier;
                 // Move up/down
                 camera.target.y += (self.up - self.down) * modifier;
 
                 // Rotate camera
-                camera.yaw -= self.horizontal.to_radians() * self.sensitivity * modifier;
+                camera.yaw += self.horizontal.to_radians() * self.sensitivity * modifier;
                 camera.pitch += self.vertical.to_radians() * self.sensitivity * modifier;
 
                 // Pitch angle safety

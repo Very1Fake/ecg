@@ -33,12 +33,12 @@ impl Vertex {
 
     #[rustfmt::skip]
     pub const INDICES: &'static [u16] = &[
-        0, 1, 3, // Front face
-        0, 4, 2, // Back face
-        0, 2, 1, // Left face
-        0, 3, 4, // Right face
-        1, 2, 3, // First bottom polygon
-        3, 2, 4, // Second bottom polygon
+        0, 3, 1, // Front face
+        0, 2, 4, // Back face
+        0, 1, 2, // Left face
+        0, 4, 3, // Right face
+        1, 3, 2, // First bottom polygon
+        3, 4, 2, // Second bottom polygon
     ];
 
     pub const ATTRS: [VertexAttribute; 2] = vertex_attr_array![0 => Float32x3, 1 => Float32x3];
