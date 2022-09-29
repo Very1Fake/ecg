@@ -1,4 +1,9 @@
 use glam::f32::{Mat4, Quat, Vec3, Vec4};
+use winit::event_loop::EventLoop as WEventLoop;
+
+// Low-level types
+
+pub type EventLoop = WEventLoop<()>;
 
 // Graphics related types
 

@@ -1,5 +1,6 @@
 use std::{iter::once, time::Instant};
 
+use anyhow::Result;
 use bytemuck::cast_slice;
 use tracing::{debug_span, info};
 use wgpu::{
@@ -56,6 +57,9 @@ pub struct Game {
 
     // In-game related
     pub last_tick: Instant,
+
+    // UI related
+    pub paused: bool,
 }
 
 impl Game {
@@ -154,7 +158,22 @@ impl Game {
             voxel,
             voxel_instance,
             last_tick: Instant::now(),
+            paused: false,
         }
+    }
+
+    /// Processes pause/resume events
+    pub fn pause(&mut self, paused: bool, window: &Window) -> Result<()> {
+        if paused {
+            self.paused = true;
+            self.camera_controller.reset();
+        } else {
+            self.paused = false;
+        }
+
+        window.grab_cursor(!self.paused)?;
+
+        Ok(())
     }
 
     #[inline]
@@ -170,7 +189,7 @@ impl Game {
         );
     }
 
-    pub fn input(&mut self, event: Event<()>, control_flow: &mut ControlFlow) {
+    pub fn input(&mut self, event: Event<()>, control_flow: &mut ControlFlow, window: &Window) {
         match event {
             Event::WindowEvent {
                 event: window_event,
@@ -185,21 +204,40 @@ impl Game {
                         },
                     ..
                 } => {
-                    match key {
+                    match (key, state) {
                         // Close game
-                        VirtualKeyCode::Escape if matches!(state, ElementState::Released) => {
-                            control_flow.set_exit()
+                        (VirtualKeyCode::Escape, ElementState::Pressed) => control_flow.set_exit(),
+                        // Pause/Resume game
+                        (VirtualKeyCode::P, ElementState::Pressed) => {
+                            // FIX: Proper error handling
+                            self.pause(!self.paused, window).unwrap()
                         }
                         _ => {}
                     }
 
-                    self.camera_controller.virtual_key(key, state);
+                    if !self.paused {
+                        self.camera_controller.virtual_key(key, state);
+                    }
                 }
-                WindowEvent::Resized(size) => self.resize(size),
+                WindowEvent::Resized(size) => {
+                    if !self.paused {
+                        self.resize(size)
+                    }
+                }
                 WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                     self.graphics.resize(*new_inner_size)
                 }
-                WindowEvent::MouseWheel { delta, .. } => self.camera_controller.mouse_wheel(delta),
+                WindowEvent::MouseWheel { delta, .. } => {
+                    if !self.paused {
+                        self.camera_controller.mouse_wheel(delta)
+                    }
+                }
+                WindowEvent::Focused(focused) => {
+                    if !focused {
+                        // FIX: Proper error handling
+                        self.pause(true, window).unwrap();
+                    }
+                }
                 _ => {}
             },
             // FIX: Abnormal touchpad sensitivity
@@ -209,7 +247,9 @@ impl Game {
                 event: DeviceEvent::MouseMotion { delta },
                 ..
             } => {
-                self.camera_controller.mouse_move(delta);
+                if !self.paused {
+                    self.camera_controller.mouse_move(delta);
+                }
             }
             _ => {}
         }
@@ -217,11 +257,15 @@ impl Game {
 
     /// Update game state
     pub fn update(&mut self) {
+        // Update in-game state
+
         // Simple tick counter
         // FIX: Make better ticking system
         let tick = Instant::now();
         let tick_dur = tick - self.last_tick;
         self.last_tick = tick;
+
+        // Update render state
 
         self.camera_controller
             .update_camera(&mut self.camera, tick_dur);

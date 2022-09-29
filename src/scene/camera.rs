@@ -230,6 +230,20 @@ impl CameraController {
     pub const MIN_DISTANCE: f32 = 0.5;
     pub const SAFE_PITCH: f32 = std::f32::consts::FRAC_2_PI;
 
+    /// Resets camera controller inputs
+    pub fn reset(&mut self) {
+        self.forward = 0.0;
+        self.backward = 0.0;
+        self.left = 0.0;
+        self.right = 0.0;
+        self.up = 0.0;
+        self.down = 0.0;
+        self.horizontal = 0.0;
+        self.vertical = 0.0;
+        self.zoom = 0.0;
+    }
+
+    /// Processes input from keyboard
     pub fn virtual_key(&mut self, key: VirtualKeyCode, state: ElementState) {
         let force = if matches!(state, ElementState::Pressed) {
             1.0
@@ -255,6 +269,7 @@ impl CameraController {
         }
     }
 
+    /// Processes input from mouse
     pub fn mouse_move(&mut self, delta: (f64, f64)) {
         // Yaw angle
         self.horizontal = delta.0 as f32;
@@ -262,6 +277,7 @@ impl CameraController {
         self.vertical = delta.1 as f32;
     }
 
+    /// Processes input from mouse wheel
     pub fn mouse_wheel(&mut self, delta: MouseScrollDelta) {
         self.zoom = match delta {
             // Assume 1 line is 10 pixels

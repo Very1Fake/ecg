@@ -28,7 +28,7 @@ fn main() -> Result<()> {
         .worker_threads(2)
         .max_blocking_threads(8)
         .build()?;
-    let window = Window::new().with_context(|| "While creating game window")?;
+    let (window, event_loop) = Window::new().with_context(|| "While creating game window")?;
 
     let graphics = {
         debug!("Opening GPU instance");
@@ -38,7 +38,7 @@ fn main() -> Result<()> {
     let game = Game::new(&window, graphics);
 
     debug!("Game starts");
-    runtime.block_on(run(window, game));
+    runtime.block_on(run(event_loop, window, game))?;
 
     Ok(())
 }

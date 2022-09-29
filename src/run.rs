@@ -1,11 +1,14 @@
+use anyhow::Result;
 use tracing::{error, info};
 use wgpu::SurfaceError;
 use winit::event::{Event, WindowEvent};
 
-use crate::{game::Game, utils::ExitCode, window::Window};
+use crate::{game::Game, types::EventLoop, utils::ExitCode, window::Window};
 
-pub async fn run(window: Window, mut game: Game) {
-    window.event_loop.run(move |event, _, control_flow| {
+pub async fn run(event_loop: EventLoop, window: Window, mut game: Game) -> Result<()> {
+    game.pause(false, &window)?;
+
+    event_loop.run(move |event, _, control_flow| {
         // Continuos rendering
         control_flow.set_poll();
 
@@ -20,13 +23,15 @@ pub async fn run(window: Window, mut game: Game) {
                 control_flow.set_exit_with_code(ExitCode::Ok.as_int());
             }
             Event::WindowEvent { .. } | Event::DeviceEvent { .. } => {
-                game.input(event, control_flow)
+                game.input(event, control_flow, &window)
             }
             Event::MainEventsCleared => {
                 window.inner.request_redraw();
             }
             Event::RedrawRequested(id) if id == window.inner.id() => {
+                // Update state
                 game.update();
+
                 match game.render() {
                     Ok(_) => {}
                     // If surface lost, try to recover it by reconfiguring
