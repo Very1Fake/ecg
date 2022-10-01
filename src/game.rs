@@ -1,8 +1,8 @@
 use std::{iter::once, time::Instant};
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use bytemuck::cast_slice;
-use tracing::{debug_span, info};
+use tracing::{debug, debug_span, info};
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferUsages, Color, CommandEncoderDescriptor, IndexFormat, LoadOp, Operations,
@@ -13,6 +13,7 @@ use winit::{
     dpi::PhysicalSize,
     event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
+    window::Fullscreen,
 };
 
 use crate::{
@@ -211,6 +212,46 @@ impl Game {
                         (VirtualKeyCode::P, ElementState::Pressed) => {
                             // FIX: Proper error handling
                             self.pause(!self.paused, window).unwrap()
+                        }
+                        // Toggle fullscreen mode
+                        (VirtualKeyCode::F11, ElementState::Pressed) => {
+                            match window.inner.fullscreen() {
+                                Some(_) => {
+                                    debug!("Switching to windowed mode");
+                                    window.inner.set_fullscreen(None)
+                                }
+                                None => {
+                                    // Available fullscreen modes for primary monitor
+                                    let mut modes = window
+                                        .inner
+                                        .primary_monitor()
+                                        .context("Can't identify primary monitor")
+                                        .unwrap()
+                                        .video_modes()
+                                        .collect::<Vec<_>>();
+
+                                    // Sort modes by size
+                                    modes.sort_by_cached_key(|mode| {
+                                        let size = mode.size();
+                                        size.height * size.width
+                                    });
+
+                                    let mode = modes
+                                        .last()
+                                        .context("Proper fullscreen mode not found")
+                                        .unwrap();
+
+                                    debug!(
+                                        size = ?mode.size(),
+                                        bit_depth = mode.bit_depth(),
+                                        refresh_rate_millihertz = mode.refresh_rate_millihertz(),
+                                        "Switching to exclusive fullscreen mode"
+                                    );
+                                    window
+                                        .inner
+                                        .set_fullscreen(Some(Fullscreen::Exclusive(mode.clone())));
+                                }
+                            }
                         }
                         _ => {}
                     }
