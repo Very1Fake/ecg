@@ -3,7 +3,7 @@ use thiserror::Error;
 use tracing::error;
 use wgpu::{
     Backends, Device, DeviceDescriptor, Features, Instance, Limits, PowerPreference, PresentMode,
-    Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureUsages,
+    Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureUsages, CompositeAlphaMode,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -81,6 +81,7 @@ impl Graphics {
             // - Mailbox: GSync (DX11/12 or NVIDIA on Vulkan)
             // TODO: Add support for switching modes in game settings
             present_mode: PresentMode::Fifo,
+            alpha_mode: CompositeAlphaMode::Auto,
         };
         surface.configure(&device, &config);
 
