@@ -2,8 +2,9 @@ use anyhow::{bail, Result};
 use thiserror::Error;
 use tracing::error;
 use wgpu::{
-    Backends, Device, DeviceDescriptor, Features, Instance, Limits, PowerPreference, PresentMode,
-    Queue, RequestAdapterOptions, Surface, SurfaceConfiguration, TextureUsages, CompositeAlphaMode,
+    Backends, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance, Limits,
+    PowerPreference, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    TextureFormat, TextureUsages,
 };
 use winit::{dpi::PhysicalSize, window::Window};
 
@@ -21,6 +22,7 @@ pub struct Graphics {
     pub queue: Queue,
     pub surface: Surface,
     pub config: SurfaceConfiguration,
+    pub supported_surface: TextureFormat,
     pub size: PhysicalSize<u32>,
 }
 
@@ -55,7 +57,7 @@ impl Graphics {
             .request_device(
                 &DeviceDescriptor {
                     label: None,
-                    features: Features::empty(),
+                    features: Features::default(),
                     // TODO: Decide wether to support WASM target or not
                     limits: Limits::default(),
                 },
@@ -63,15 +65,17 @@ impl Graphics {
             )
             .await?;
 
+        let supported_surface = match surface.get_supported_formats(&adapter).get(0) {
+            Some(format) => *format,
+            None => {
+                error!("Adapter doesn't have compatible surface format");
+                bail!(GraphicsError::CompatibleSurfaceFormatNotFound)
+            }
+        };
+
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
-            format: match surface.get_supported_formats(&adapter).get(0) {
-                Some(format) => *format,
-                None => {
-                    error!("Adapter doesn't have compatible surface format");
-                    bail!(GraphicsError::CompatibleSurfaceFormatNotFound)
-                }
-            },
+            format: supported_surface,
             width: size.width,
             height: size.height,
             // Rendering mode
@@ -90,6 +94,7 @@ impl Graphics {
             queue,
             surface,
             config,
+            supported_surface,
             size,
         })
     }

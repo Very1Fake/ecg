@@ -105,9 +105,15 @@ pub enum CameraMode {
     },
 }
 
+impl CameraMode {
+    pub const DEFAULT_DISTANCE: f32 = 2.5;
+}
+
 impl Default for CameraMode {
     fn default() -> Self {
-        Self::ThirdPerson { distance: 2.5 }
+        Self::ThirdPerson {
+            distance: Self::DEFAULT_DISTANCE,
+        }
     }
 }
 
@@ -119,8 +125,8 @@ pub struct Camera {
     /// Position of the target
     pub target: Float32x3,
 
-    yaw: f32,
-    pitch: f32,
+    pub yaw: f32,
+    pub pitch: f32,
 
     /// Camera mode
     pub mode: CameraMode,
@@ -136,30 +142,26 @@ pub struct Camera {
 }
 
 impl Camera {
+    pub const DEFAULT_POSITION: Float32x3 = Float32x3::new(0.0, 0.5, 5.0);
+    pub const DEFAULT_TARGET: Float32x3 = Float32x3::ZERO;
+    pub const DEFAULT_YAW: f32 = -90.0;
+    pub const DEFAULT_PITCH: f32 = 15.0;
+    pub const DEFAULT_FOV: f32 = 45.0;
+    pub const Z_NEAR: f32 = 0.1;
+    pub const Z_FAR: f32 = 100.0;
+
     // TODO: Split camera and player controllers
-    pub fn new(
-        position: Float32x3,
-        target: Float32x3,
-        // Pass as degrees
-        yaw: f32,
-        // Pass as degrees
-        pitch: f32,
-        width: u32,
-        height: u32,
-        fov: Rad,
-        near: f32,
-        far: f32,
-    ) -> Self {
+    pub fn new(width: u32, height: u32) -> Self {
         Self {
-            position,
-            target,
-            yaw: yaw.to_radians(),
-            pitch: pitch.to_radians(),
+            position: Self::DEFAULT_POSITION,
+            target: Self::DEFAULT_TARGET,
+            yaw: Self::DEFAULT_YAW.to_radians(),
+            pitch: Self::DEFAULT_PITCH.to_radians(),
             aspect: width as f32 / height as f32,
             mode: CameraMode::default(),
-            fov,
-            near,
-            far,
+            fov: Self::DEFAULT_FOV,
+            near: Self::Z_NEAR,
+            far: Self::Z_FAR,
         }
     }
 
@@ -228,7 +230,7 @@ impl CameraController {
     pub const SPEED: f32 = 2.0;
     pub const SCROLL_SENSITIVITY: f32 = 0.5;
     pub const MIN_DISTANCE: f32 = 0.5;
-    pub const SAFE_PITCH: f32 = std::f32::consts::FRAC_2_PI;
+    pub const SAFE_PITCH: f32 = 1.57;
 
     /// Resets camera controller inputs
     pub fn reset(&mut self) {

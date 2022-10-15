@@ -7,14 +7,17 @@ use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferUsages, Color, CommandEncoderDescriptor, IndexFormat, LoadOp, Operations,
     RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor,
-    SurfaceError, TextureViewDescriptor,
+    TextureViewDescriptor,
 };
 use winit::{
     dpi::PhysicalSize,
-    event::{DeviceEvent, ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{DeviceEvent, ElementState, KeyboardInput, VirtualKeyCode, WindowEvent},
     event_loop::ControlFlow,
     window::Fullscreen,
 };
+
+#[cfg(feature = "debug_ui")]
+use crate::egui::{DebugPayload, DebugUI};
 
 use crate::{
     graphics::Graphics,
@@ -29,7 +32,7 @@ use crate::{
         camera::{Camera, CameraBind, CameraController},
         figure::voxel::Voxel,
     },
-    types::{Float32x3, Rotation},
+    types::{Event, Float32x3, Rotation},
     window::Window,
 };
 
@@ -47,6 +50,10 @@ pub struct Game {
     pub instance_buffer: Buffer,
     pub depth_texture: Texture,
 
+    // Debug UI
+    #[cfg(feature = "debug_ui")]
+    pub debug_ui: DebugUI,
+
     // Rendering related
     pub camera: Camera,
     pub camera_controller: CameraController,
@@ -57,6 +64,7 @@ pub struct Game {
     pub voxel_instance: Instance,
 
     // In-game related
+    pub start_time: Instant,
     pub last_tick: Instant,
 
     // UI related
@@ -67,22 +75,13 @@ impl Game {
     pub fn new(window: &Window, graphics: Graphics) -> Self {
         // Logging span
         let _span = debug_span!("game_init").entered();
+        let now = Instant::now();
 
         info!("Creating new game instance");
 
         let camera = {
             let size = window.inner.inner_size();
-            Camera::new(
-                Float32x3::new(0.0, 0.5, 5.0),
-                Float32x3::ZERO,
-                -90.0,
-                15.0,
-                size.width,
-                size.height,
-                45.0,
-                0.1,
-                100.0,
-            )
+            Camera::new(size.width, size.height)
         };
         info!("Creating camera binds");
         let camera_bind = CameraBind::new(&graphics.device, &camera);
@@ -138,6 +137,12 @@ impl Game {
 
         let depth_texture = Texture::new_depth(&graphics.device, &graphics.config, "Depth Texture");
 
+        #[cfg(feature = "debug_ui")]
+        let debug_ui = {
+            info!("Initializing debug UI");
+            DebugUI::new(&window.inner, &graphics)
+        };
+
         let voxel = Voxel::new(&graphics.device);
 
         // TODO: Refactor: make more structs
@@ -153,18 +158,21 @@ impl Game {
             index_buffer,
             instance_buffer,
             depth_texture,
+            #[cfg(feature = "debug_ui")]
+            debug_ui,
             camera,
             camera_controller: CameraController::default(),
             camera_bind,
             voxel,
             voxel_instance,
-            last_tick: Instant::now(),
+            start_time: now,
+            last_tick: now,
             paused: false,
         }
     }
 
     /// Processes pause/resume events
-    pub fn pause(&mut self, paused: bool, window: &Window) -> Result<()> {
+    pub fn pause(&mut self, paused: bool, window: &mut Window) -> Result<()> {
         if paused {
             self.paused = true;
             self.camera_controller.reset();
@@ -181,12 +189,12 @@ impl Game {
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
         // Resize with 0 width and height is used by winit to signal a minimize event on Windows.
         // See: https://github.com/rust-windowing/winit/issues/208
-        if size.width != 0 && size.height != 0 {
+        if size.width > 0 && size.height > 0 {
             self.graphics.resize(size);
             self.camera.proj_resize(size.width, size.height);
 
-        // Recreate depth texture with new surface size
-        self.depth_texture = Texture::new_depth(
+            // Recreate depth texture with new surface size
+            self.depth_texture = Texture::new_depth(
                 &self.graphics.device,
                 &self.graphics.config,
                 "Depth Texture",
@@ -194,7 +202,13 @@ impl Game {
         }
     }
 
-    pub fn input(&mut self, event: Event<()>, control_flow: &mut ControlFlow, window: &Window) {
+    // TODO: Use `winit_input_helper`
+    pub fn input(&mut self, event: Event, control_flow: &mut ControlFlow, window: &mut Window) {
+        #[cfg(feature = "debug_ui")]
+        // Let debug UI handle occurred event, if cursor detached from camera
+        self.debug_ui.event(&event, self.paused);
+
+        // Update
         match event {
             Event::WindowEvent {
                 event: window_event,
@@ -216,6 +230,11 @@ impl Game {
                         (VirtualKeyCode::P, ElementState::Pressed) => {
                             // FIX: Proper error handling
                             self.pause(!self.paused, window).unwrap()
+                        }
+                        // Toggle debug UI
+                        #[cfg(feature = "debug_ui")]
+                        (VirtualKeyCode::F3, ElementState::Released) => {
+                            self.debug_ui.enabled = !self.debug_ui.enabled
                         }
                         // Toggle fullscreen mode
                         (VirtualKeyCode::F11, ElementState::Pressed) => {
@@ -302,8 +321,6 @@ impl Game {
 
     /// Update game state
     pub fn update(&mut self) {
-        // Update in-game state
-
         // Simple tick counter
         // FIX: Make better ticking system
         let tick = Instant::now();
@@ -311,7 +328,6 @@ impl Game {
         self.last_tick = tick;
 
         // Update render state
-
         self.camera_controller
             .update_camera(&mut self.camera, tick_dur);
         self.camera_bind
@@ -324,9 +340,21 @@ impl Game {
             0,
             cast_slice(&[self.voxel_instance.as_raw()]),
         );
+
+        #[cfg(feature = "debug_ui")]
+        {
+            // Update internal egui time (used for animations)
+            self.debug_ui
+                .platform
+                .update_time(self.start_time.elapsed().as_secs_f64());
+            // Update debug UI and apply game state changes
+            self.debug_ui.update(DebugPayload {
+                camera: &mut self.camera,
+            });
+        }
     }
 
-    pub fn render(&self) -> Result<(), SurfaceError> {
+    pub fn render(&mut self, window: &Window) -> Result<()> {
         // Texture for drawing (frame)
         let output = self.graphics.surface.get_current_texture()?;
 
@@ -340,57 +368,77 @@ impl Game {
             .graphics
             .device
             .create_command_encoder(&CommandEncoderDescriptor {
-                label: Some("Main Pipe Encoder"),
+                label: Some("CommandEncoder"),
             });
 
-        let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
-            label: Some("Main Render Pass"),
-            // Where to we draw colors
-            color_attachments: &[Some(RenderPassColorAttachment {
-                view: &view,
-                resolve_target: None,
-                ops: Operations {
-                    // Where to pick the previous frame.
-                    // Clears screen with specified color
-                    // NOTE: Right now used as simple skybox
-                    load: LoadOp::Clear(Color {
-                        r: 0.458,
-                        g: 0.909,
-                        b: 1.0,
-                        a: 1.0,
+        // Draw in-game objects
+        {
+            let mut render_pass = encoder.begin_render_pass(&RenderPassDescriptor {
+                label: Some("Main Render Pass"),
+                // Where to we draw colors
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: Operations {
+                        // Where to pick the previous frame.
+                        // Clears screen with specified color
+                        // NOTE: Right now used as simple skybox
+                        load: LoadOp::Clear(Color {
+                            r: 0.458,
+                            g: 0.909,
+                            b: 1.0,
+                            a: 1.0,
+                        }),
+                        // Write results to texture
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
                     }),
-                    // Write results to texture
-                    store: true,
-                },
-            })],
-            depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                view: &self.depth_texture.view,
-                depth_ops: Some(Operations {
-                    load: LoadOp::Clear(1.0),
-                    store: true,
+                    stencil_ops: None,
                 }),
-                stencil_ops: None,
-            }),
-        });
+            });
 
-        // Draw "terrain"
-        render_pass.set_pipeline(&self.terrain_pipeline.pipeline);
-        render_pass.set_bind_group(0, &self.camera_bind.bind_group, &[]);
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
-        render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
+            // Draw "terrain"
+            render_pass.set_pipeline(&self.terrain_pipeline.pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind.bind_group, &[]);
+            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+            render_pass.set_index_buffer(self.index_buffer.slice(..), IndexFormat::Uint16);
+            render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
 
-        // Draw figures
-        render_pass.set_pipeline(&self.figure_pipeline.pipeline);
-        render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
-        render_pass.draw_model(&self.voxel, &self.camera_bind);
+            // Draw figures
+            render_pass.set_pipeline(&self.figure_pipeline.pipeline);
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            render_pass.draw_model(&self.voxel, &self.camera_bind);
+        }
 
-        drop(render_pass);
+        // Draw debug UI
+        #[cfg(feature = "debug_ui")]
+        let egui_draw = self.debug_ui.render(
+            &self.graphics.device,
+            &self.graphics.queue,
+            &window.inner,
+            &self.graphics.config,
+            &view,
+            &mut encoder,
+        )?;
 
         // Submit render operations
         self.graphics.queue.submit(once(encoder.finish()));
         // Show rendered frame
         output.present();
+
+        #[cfg(feature = "debug_ui")]
+        if let Some(textures_delta) = egui_draw {
+            self.debug_ui.cleanup(textures_delta)?;
+        }
+
+        // Something can reset cursor visibility
+        window.apply_cursor_visibility();
 
         Ok(())
     }

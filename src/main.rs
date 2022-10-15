@@ -1,6 +1,8 @@
 #![windows_subsystem = "windows"]
 
 pub mod bootstrap;
+#[cfg(feature = "debug_ui")]
+pub mod egui;
 pub mod game;
 pub mod graphics;
 pub mod render;
@@ -19,6 +21,7 @@ use run::run;
 
 use crate::{game::Game, graphics::Graphics, utils::VERSION, window::Window};
 
+// TODO: Drop anyhow
 fn main() -> Result<()> {
     bootstrap()?;
 

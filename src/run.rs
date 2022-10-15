@@ -5,8 +5,8 @@ use winit::event::{Event, WindowEvent};
 
 use crate::{game::Game, types::EventLoop, utils::ExitCode, window::Window};
 
-pub async fn run(event_loop: EventLoop, window: Window, mut game: Game) -> Result<()> {
-    game.pause(false, &window)?;
+pub async fn run(event_loop: EventLoop, mut window: Window, mut game: Game) -> Result<()> {
+    game.pause(false, &mut window)?;
 
     event_loop.run(move |event, _, control_flow| {
         // Continuos rendering
@@ -23,7 +23,7 @@ pub async fn run(event_loop: EventLoop, window: Window, mut game: Game) -> Resul
                 control_flow.set_exit_with_code(ExitCode::Ok.as_int());
             }
             Event::WindowEvent { .. } | Event::DeviceEvent { .. } => {
-                game.input(event, control_flow, &window)
+                game.input(event, control_flow, &mut window)
             }
             Event::MainEventsCleared => {
                 window.inner.request_redraw();
@@ -32,15 +32,22 @@ pub async fn run(event_loop: EventLoop, window: Window, mut game: Game) -> Resul
                 // Update state
                 game.update();
 
-                match game.render() {
+                // Render game frame
+                match game.render(&window) {
                     Ok(_) => {}
-                    // If surface lost, try to recover it by reconfiguring
-                    Err(SurfaceError::Lost) => game.graphics.recover_surface(),
-                    Err(SurfaceError::OutOfMemory) => {
-                        error!("GPU ran out of memory. Exiting");
-                        control_flow.set_exit_with_code(ExitCode::OutOfVideoMemory.as_int());
+                    Err(err) => {
+                        match err.downcast::<SurfaceError>() {
+                            // If surface lost, try to recover it by reconfiguring
+                            Ok(SurfaceError::Lost) => game.graphics.recover_surface(),
+                            Ok(SurfaceError::OutOfMemory) => {
+                                error!("GPU ran out of memory. Exiting");
+                                control_flow
+                                    .set_exit_with_code(ExitCode::OutOfVideoMemory.as_int());
+                            }
+                            Ok(_) => {}
+                            Err(err) => error!("{err:?}"),
+                        }
                     }
-                    Err(err) => error!("{err:?}"),
                 }
             }
             _ => {}
