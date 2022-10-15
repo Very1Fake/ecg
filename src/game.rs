@@ -177,17 +177,21 @@ impl Game {
         Ok(())
     }
 
-    #[inline]
+    /// Handles window resize event
     pub fn resize(&mut self, size: PhysicalSize<u32>) {
-        self.graphics.resize(size);
-        self.camera.proj_resize(size.width, size.height);
+        // Resize with 0 width and height is used by winit to signal a minimize event on Windows.
+        // See: https://github.com/rust-windowing/winit/issues/208
+        if size.width != 0 && size.height != 0 {
+            self.graphics.resize(size);
+            self.camera.proj_resize(size.width, size.height);
 
         // Recreate depth texture with new surface size
         self.depth_texture = Texture::new_depth(
-            &self.graphics.device,
-            &self.graphics.config,
-            "Depth Texture",
-        );
+                &self.graphics.device,
+                &self.graphics.config,
+                "Depth Texture",
+            );
+        }
     }
 
     pub fn input(&mut self, event: Event<()>, control_flow: &mut ControlFlow, window: &Window) {
