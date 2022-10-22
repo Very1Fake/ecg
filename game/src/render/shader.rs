@@ -23,7 +23,7 @@ impl Shader for TerrainShader {
     const DESCRIPTOR: ShaderModuleDescriptor<'static> = ShaderModuleDescriptor {
         label: Some("Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-            "../../assets/shaders/terrain.wgsl"
+            "../../../assets/shaders/terrain.wgsl"
         ))),
     };
 }
@@ -34,7 +34,7 @@ impl Shader for FigureShader {
     const DESCRIPTOR: ShaderModuleDescriptor<'static> = ShaderModuleDescriptor {
         label: Some("Shader"),
         source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-            "../../assets/shaders/figure.wgsl"
+            "../../../assets/shaders/figure.wgsl"
         ))),
     };
 }
