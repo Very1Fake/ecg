@@ -1,13 +1,12 @@
 // TODO: Make crate from this module
 
-use anyhow::{Context as ResultContext, Result};
+use anyhow::Result;
 use egui::{
-    global_dark_light_mode_switch, Context, FontDefinitions, FullOutput, Style, TexturesDelta,
-    TopBottomPanel, Window,
+    global_dark_light_mode_switch, Context, FontDefinitions, Style, TexturesDelta, TopBottomPanel,
+    Window,
 };
-use egui_wgpu_backend::{RenderPass, ScreenDescriptor};
+use egui_wgpu_backend::RenderPass;
 use egui_winit_platform::{Platform, PlatformDescriptor};
-use wgpu::{CommandEncoder, Device, Queue, SurfaceConfiguration, TextureView};
 use winit::{event::WindowEvent, window::Window as WinitWindow};
 
 use crate::{
@@ -16,18 +15,18 @@ use crate::{
     types::Event,
 };
 
-/// Handles everything related to debug UI drawing
-pub struct DebugUI {
+/// Handles everything related to debug overlay drawing
+pub struct DebugOverlay {
     // Inner state
     pub enabled: bool,
     pub platform: Platform,
-    pub state: DebugUIState,
+    pub state: DebugOverlayState,
 
     // Graphics
     pub render_pass: RenderPass,
 }
 
-impl DebugUI {
+impl DebugOverlay {
     pub fn new(window: &WinitWindow, graphics: &Graphics) -> Self {
         let size = window.inner_size();
 
@@ -40,7 +39,7 @@ impl DebugUI {
                 font_definitions: FontDefinitions::default(),
                 style: Style::default(),
             }),
-            state: DebugUIState::default(),
+            state: DebugOverlayState::default(),
             render_pass: RenderPass::new(&graphics.device, graphics.supported_surface, 1),
         }
     }
@@ -85,51 +84,6 @@ impl DebugUI {
         }
     }
 
-    pub fn render(
-        &mut self,
-        device: &Device,
-        queue: &Queue,
-        window: &WinitWindow,
-        surface_config: &SurfaceConfiguration,
-        view: &TextureView,
-        encoder: &mut CommandEncoder,
-    ) -> Result<Option<TexturesDelta>> {
-        if self.enabled {
-            // Finalize frame
-            // FIX: Fixes cursor flickering, but cursor icons won't change
-            let FullOutput {
-                textures_delta,
-                shapes,
-                ..
-            } = self.platform.end_frame(None);
-
-            // Tesselate shapes
-            let paint_jobs = self.platform.context().tessellate(shapes);
-
-            let screen_descriptor = &ScreenDescriptor {
-                physical_width: surface_config.width,
-                physical_height: surface_config.height,
-                scale_factor: window.scale_factor() as f32,
-            };
-
-            // Send textures and update buffers
-            self.render_pass
-                .add_textures(device, queue, &textures_delta)
-                .context("While uploading UI texture")?;
-            self.render_pass
-                .update_buffers(device, queue, &paint_jobs, screen_descriptor);
-
-            // Record all commands to encoder
-            self.render_pass
-                .execute(encoder, view, &paint_jobs, screen_descriptor, None)
-                .context("While executing ui commands")?;
-
-            Ok(Some(textures_delta))
-        } else {
-            Ok(None)
-        }
-    }
-
     pub fn cleanup(&mut self, textures_delta: TexturesDelta) -> Result<()> {
         self.render_pass.remove_textures(textures_delta)?;
 
@@ -141,14 +95,14 @@ pub struct DebugPayload<'a> {
     pub camera: &'a mut Camera,
 }
 
-/// Represents debug UI state (windows, buttons, etc.)
+/// Represents debug overlay state (windows, buttons, etc.)
 #[derive(Default)]
-pub struct DebugUIState {
+pub struct DebugOverlayState {
     /// Camera tracker window
     camera_tracker_opened: bool,
 }
 
-impl DebugUIState {
+impl DebugOverlayState {
     // TODO: Shift+F3 shortcut to hide menu_bar
     pub fn draw(&mut self, ctx: &Context, payload: DebugPayload) {
         TopBottomPanel::top("menu_bar").show(ctx, |ui| {

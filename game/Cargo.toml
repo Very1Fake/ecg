@@ -8,9 +8,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["debug_ui"]
+default = ["debug_overlay"]
 
-debug_ui = ["egui", "egui_winit_platform", "egui_wgpu_backend"]
+debug_overlay = ["egui", "egui_winit_platform", "egui_wgpu_backend"]
 
 [dependencies]
 anyhow = "1.0"

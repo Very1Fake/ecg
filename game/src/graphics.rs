@@ -1,12 +1,14 @@
 use anyhow::{bail, Result};
 use thiserror::Error;
-use tracing::error;
+use tracing::{debug_span, error, warn};
 use wgpu::{
-    Backends, CompositeAlphaMode, Device, DeviceDescriptor, Features, Instance, Limits,
-    PowerPreference, PresentMode, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
-    TextureFormat, TextureUsages,
+    Backends, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features,
+    Instance, Limits, PowerPreference, PresentMode, Queue, RequestAdapterOptions, Surface,
+    SurfaceConfiguration, SurfaceError, TextureFormat, TextureUsages,
 };
 use winit::{dpi::PhysicalSize, window::Window};
+
+use crate::render::{drawer::Drawer, texture::Texture};
 
 #[derive(Error, Debug)]
 pub enum GraphicsError {
@@ -24,10 +26,13 @@ pub struct Graphics {
     pub config: SurfaceConfiguration,
     pub supported_surface: TextureFormat,
     pub size: PhysicalSize<u32>,
+    pub depth_texture: Texture,
 }
 
 impl Graphics {
     pub async fn new(window: &Window) -> Result<Self> {
+        let _span = debug_span!("graphics_init").entered();
+
         let size = window.inner_size();
 
         // Create new API instance (Primary APIs: Vulkan, DX12, Metal)
@@ -89,6 +94,8 @@ impl Graphics {
         };
         surface.configure(&device, &config);
 
+        let depth_texture = Texture::new_depth(&device, &config, "Depth Texture");
+
         Ok(Self {
             device,
             queue,
@@ -96,6 +103,7 @@ impl Graphics {
             config,
             supported_surface,
             size,
+            depth_texture,
         })
     }
 
@@ -106,7 +114,35 @@ impl Graphics {
         self.surface.configure(&self.device, &self.config)
     }
 
-    pub fn recover_surface(&mut self) {
-        self.resize(self.size)
+    /// Start frame rendering and create `Drawer`
+    /// If there is an intermittent issue with the surface
+    /// then Ok(None) will be returned
+    pub fn start_frame<'a>(&'a mut self) -> Result<Option<Drawer<'a>>> {
+        // Used to send series of operations to GPU
+        let encoder = self
+            .device
+            .create_command_encoder(&CommandEncoderDescriptor {
+                label: Some("FirstPassEncoder"),
+            });
+
+        // The current frame texture to draw
+        let texture = match self.surface.get_current_texture() {
+            Ok(tex) => tex,
+            Err(err @ (SurfaceError::Lost | SurfaceError::Outdated)) => {
+                warn!("{} Recreating surface (frame will be missed)", err);
+                self.resize(self.size);
+                return Ok(None);
+            }
+            Err(SurfaceError::Timeout) => {
+                // This will be resolved on the next frame
+                return Ok(None);
+            }
+            Err(err @ SurfaceError::OutOfMemory) => {
+                // If surface lost, try to recover it by reconfiguring
+                bail!(err)
+            }
+        };
+
+        Ok(Some(Drawer::new(encoder, self, texture)))
     }
 }

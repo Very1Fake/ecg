@@ -1,7 +1,7 @@
 #![windows_subsystem = "windows"]
 
 pub mod bootstrap;
-#[cfg(feature = "debug_ui")]
+#[cfg(feature = "debug_overlay")]
 pub mod egui;
 pub mod game;
 pub mod graphics;

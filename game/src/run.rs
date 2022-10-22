@@ -1,6 +1,5 @@
 use anyhow::Result;
 use tracing::{error, info};
-use wgpu::SurfaceError;
 use winit::event::{Event, WindowEvent};
 
 use crate::{game::Game, types::EventLoop, utils::ExitCode, window::Window};
@@ -35,19 +34,7 @@ pub async fn run(event_loop: EventLoop, mut window: Window, mut game: Game) -> R
                 // Render game frame
                 match game.render(&window) {
                     Ok(_) => {}
-                    Err(err) => {
-                        match err.downcast::<SurfaceError>() {
-                            // If surface lost, try to recover it by reconfiguring
-                            Ok(SurfaceError::Lost) => game.graphics.recover_surface(),
-                            Ok(SurfaceError::OutOfMemory) => {
-                                error!("GPU ran out of memory. Exiting");
-                                control_flow
-                                    .set_exit_with_code(ExitCode::OutOfVideoMemory.as_int());
-                            }
-                            Ok(_) => {}
-                            Err(err) => error!("{err:?}"),
-                        }
-                    }
+                    Err(err) => error!("{err:?}"),
                 }
             }
             _ => {}
