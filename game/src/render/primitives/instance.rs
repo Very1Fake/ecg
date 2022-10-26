@@ -3,7 +3,10 @@ use core::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::types::{Float32x3, Matrix4, Rotation};
+use crate::{
+    render::buffer::Bufferable,
+    types::{Float32x3, Matrix4, Rotation},
+};
 
 /// Represents instance options
 pub struct Instance {
@@ -11,6 +14,10 @@ pub struct Instance {
     pub position: Float32x3,
     // Rotation of the instance
     pub rotation: Rotation,
+}
+
+impl Bufferable for Instance {
+    const LABEL: &'static str = "InstanceBuffer";
 }
 
 impl Instance {
@@ -41,4 +48,8 @@ impl RawInstance {
         step_mode: VertexStepMode::Instance,
         attributes: &Self::ATTRS,
     };
+}
+
+impl Bufferable for RawInstance {
+    const LABEL: &'static str = "InstanceBuffer";
 }

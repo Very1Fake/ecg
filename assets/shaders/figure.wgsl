@@ -1,7 +1,9 @@
 /// Camera
 
 struct CameraUniform {
-    projection: mat4x4<f32>,
+    proj_mat: mat4x4<f32>,
+    view_mat: mat4x4<f32>,
+    all_mat: mat4x4<f32>,
 }
 
 @group(0)
@@ -45,7 +47,7 @@ fn vs_main(
     );
 
     // Manual casting of `VertexModel` to `VertexOutput`
-    out.clip_pos = camera.projection * model_matrix * vec4<f32>(model.pos, 1.0);
+    out.clip_pos = camera.all_mat * model_matrix * vec4<f32>(model.pos, 1.0);
     out.color = model.color;
 
     return out;

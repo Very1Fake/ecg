@@ -1,17 +1,17 @@
 // TODO: Make crate from this module
 
-use anyhow::Result;
 use egui::{
-    global_dark_light_mode_switch, Context, FontDefinitions, Style, TexturesDelta, TopBottomPanel,
-    Window,
+    global_dark_light_mode_switch, Context, FontDefinitions, Style, TopBottomPanel, Window,
 };
-use egui_wgpu_backend::RenderPass;
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use winit::{event::WindowEvent, window::Window as WinitWindow};
 
 use crate::{
-    graphics::Graphics,
-    scene::camera::{Camera, CameraMode},
+    render::renderer::Renderer,
+    scene::{
+        camera::{Camera, CameraMode},
+        Scene,
+    },
     types::Event,
 };
 
@@ -20,14 +20,11 @@ pub struct DebugOverlay {
     // Inner state
     pub enabled: bool,
     pub platform: Platform,
-    pub state: DebugOverlayState,
-
-    // Graphics
-    pub render_pass: RenderPass,
+    state: DebugOverlayState,
 }
 
 impl DebugOverlay {
-    pub fn new(window: &WinitWindow, graphics: &Graphics) -> Self {
+    pub fn new(window: &WinitWindow) -> Self {
         let size = window.inner_size();
 
         Self {
@@ -40,8 +37,12 @@ impl DebugOverlay {
                 style: Style::default(),
             }),
             state: DebugOverlayState::default(),
-            render_pass: RenderPass::new(&graphics.device, graphics.supported_surface, 1),
         }
+    }
+
+    #[inline]
+    pub fn toggle(&mut self) {
+        self.enabled = !self.enabled
     }
 
     pub fn event(&mut self, event: &Event, paused: bool) {
@@ -74,7 +75,10 @@ impl DebugOverlay {
         }
     }
 
-    pub fn update(&mut self, payload: DebugPayload) {
+    pub fn update(&mut self, elapsed: f64, payload: DebugPayload) {
+        // Update internal egui time (used for animations)
+        self.platform.update_time(elapsed);
+
         if self.enabled {
             // Begin frame
             self.platform.begin_frame();
@@ -83,21 +87,18 @@ impl DebugOverlay {
             self.state.draw(&self.platform.context(), payload);
         }
     }
-
-    pub fn cleanup(&mut self, textures_delta: TexturesDelta) -> Result<()> {
-        self.render_pass.remove_textures(textures_delta)?;
-
-        Ok(())
-    }
 }
 
 pub struct DebugPayload<'a> {
-    pub camera: &'a mut Camera,
+    pub scene: &'a mut Scene,
+    pub renderer: &'a Renderer,
 }
 
 /// Represents debug overlay state (windows, buttons, etc.)
 #[derive(Default)]
 pub struct DebugOverlayState {
+    /// Debug info
+    wgpu_profiler_opened: bool,
     /// Camera tracker window
     camera_tracker_opened: bool,
 }
@@ -109,23 +110,39 @@ impl DebugOverlayState {
             ui.horizontal_wrapped(|ui| {
                 global_dark_light_mode_switch(ui);
                 ui.separator();
+                ui.menu_button("Game", |menu| {
+                    if menu.button("wgpu Profiler").clicked() {
+                        self.wgpu_profiler_opened = true;
+                    }
+                });
                 ui.menu_button("Scene", |menu| {
                     if menu.button("Camera Stats").clicked() {
                         self.camera_tracker_opened = true;
                     }
                     if menu.button("Reset").clicked() {
-                        match &mut payload.camera.mode {
+                        match &mut payload.scene.camera.mode {
                             CameraMode::ThirdPerson { distance } => {
                                 *distance = CameraMode::DEFAULT_DISTANCE
                             }
                         }
-                        payload.camera.target = Camera::DEFAULT_TARGET;
-                        payload.camera.yaw = Camera::DEFAULT_YAW.to_radians();
-                        payload.camera.pitch = Camera::DEFAULT_PITCH.to_radians();
+                        payload.scene.camera.target = Camera::DEFAULT_TARGET;
+                        payload.scene.camera.yaw = Camera::DEFAULT_YAW.to_radians();
+                        payload.scene.camera.pitch = Camera::DEFAULT_PITCH.to_radians();
                     }
                 })
             })
         });
+
+        Window::new("wgpu Profiler")
+            .open(&mut self.wgpu_profiler_opened)
+            .collapsible(false)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.label(format!(
+                    "wgpu Backend: {}",
+                    payload.renderer.graphics_backend()
+                ));
+            });
 
         Window::new("Camera Tracker")
             .open(&mut self.camera_tracker_opened)
@@ -137,18 +154,18 @@ impl DebugOverlayState {
                     Target: x:{:.3} y:{:.3} z:{:.3}\n\
                     Yaw: {:.3} ({:.2})\n\
                     Pitch: {:.3} ({:.2})",
-                    payload.camera.position.x,
-                    payload.camera.position.y,
-                    payload.camera.position.z,
-                    payload.camera.target.x,
-                    payload.camera.target.y,
-                    payload.camera.target.z,
-                    payload.camera.yaw,
-                    payload.camera.yaw.to_degrees(),
-                    payload.camera.pitch,
-                    payload.camera.pitch.to_degrees(),
+                    payload.scene.camera.position.x,
+                    payload.scene.camera.position.y,
+                    payload.scene.camera.position.z,
+                    payload.scene.camera.target.x,
+                    payload.scene.camera.target.y,
+                    payload.scene.camera.target.z,
+                    payload.scene.camera.yaw,
+                    payload.scene.camera.yaw.to_degrees(),
+                    payload.scene.camera.pitch,
+                    payload.scene.camera.pitch.to_degrees(),
                 ));
-                ui.label(format!("{:?}", payload.camera.mode))
+                ui.label(format!("{:?}", payload.scene.camera.mode))
             });
     }
 }

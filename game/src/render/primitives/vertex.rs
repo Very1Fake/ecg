@@ -3,7 +3,7 @@ use std::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::{test_buffer_align, types::Float32x3};
+use crate::{render::buffer::Bufferable, test_buffer_align, types::Float32x3};
 
 // TODO: Make separate vertex structs for each pipeline
 /// Represents vertex data sent to vertex buffer
@@ -12,6 +12,10 @@ use crate::{test_buffer_align, types::Float32x3};
 pub struct Vertex {
     pub position: Float32x3,
     pub color: Float32x3,
+}
+
+impl Bufferable for Vertex {
+    const LABEL: &'static str = "VertexBuffer";
 }
 
 test_buffer_align!(Vertex);

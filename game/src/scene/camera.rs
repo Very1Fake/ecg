@@ -1,99 +1,8 @@
 use std::time::Duration;
 
-use bytemuck::{cast_slice, Pod, Zeroable};
-use wgpu::{
-    util::{BufferInitDescriptor, DeviceExt},
-    BindGroup, BindGroupDescriptor, BindGroupEntry, BindGroupLayout, BindGroupLayoutDescriptor,
-    BindGroupLayoutEntry, BindingType, Buffer, BufferBindingType, BufferUsages, Device, Queue,
-    ShaderStages,
-};
 use winit::event::{ElementState, MouseScrollDelta, VirtualKeyCode};
 
-use crate::types::{Float32x3, Matrix4, Rad, RawMatrix4};
-
-/// Helper struct to send camera data to shader
-#[derive(Pod, Zeroable, Clone, Copy)]
-#[repr(C)]
-pub struct CameraUniform {
-    projection: RawMatrix4,
-}
-
-impl CameraUniform {
-    pub fn new(projection: RawMatrix4) -> Self {
-        Self { projection }
-    }
-}
-
-impl Default for CameraUniform {
-    fn default() -> Self {
-        Self {
-            projection: Matrix4::IDENTITY.to_cols_array_2d(),
-        }
-    }
-}
-
-/// Stores all necessary binding for camera
-/// Also updates camera buffer
-pub struct CameraBind {
-    pub layout: BindGroupLayout,
-    pub buffer: Buffer,
-    pub bind_group: BindGroup,
-}
-
-impl CameraBind {
-    pub const LAYOUT_DESCRIPTOR: BindGroupLayoutDescriptor<'static> = BindGroupLayoutDescriptor {
-        label: Some("Camera Bind Group Layout"),
-        entries: &[BindGroupLayoutEntry {
-            binding: 0,
-            visibility: ShaderStages::VERTEX,
-            ty: BindingType::Buffer {
-                ty: BufferBindingType::Uniform,
-                has_dynamic_offset: false,
-                min_binding_size: None,
-            },
-            count: None,
-        }],
-    };
-
-    fn camera_layout(device: &Device) -> BindGroupLayout {
-        device.create_bind_group_layout(&Self::LAYOUT_DESCRIPTOR)
-    }
-
-    fn camera_buffer(device: &Device, projection: CameraUniform) -> Buffer {
-        device.create_buffer_init(&BufferInitDescriptor {
-            label: Some("Camera Buffer"),
-            contents: cast_slice(&[projection]),
-            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
-        })
-    }
-
-    fn camera_bind_group(device: &Device, layout: &BindGroupLayout, buffer: &Buffer) -> BindGroup {
-        device.create_bind_group(&BindGroupDescriptor {
-            label: Some("Camera Bind Group"),
-            layout,
-            entries: &[BindGroupEntry {
-                binding: 0,
-                resource: buffer.as_entire_binding(),
-            }],
-        })
-    }
-
-    pub fn new(device: &Device, camera: &Camera) -> Self {
-        let layout = Self::camera_layout(device);
-        let buffer = Self::camera_buffer(device, camera.uniform());
-        let bind_group = Self::camera_bind_group(device, &layout, &buffer);
-
-        Self {
-            layout,
-            buffer,
-            bind_group,
-        }
-    }
-
-    pub fn update_buffer(&self, queue: &Queue, uniform: &CameraUniform) {
-        queue.write_buffer(&self.buffer, 0, cast_slice(&[*uniform]))
-    }
-}
+use crate::types::{Float32x3, Matrix4, Rad};
 
 /// Represents camera mode
 #[derive(Debug)]
@@ -150,14 +59,14 @@ impl Camera {
     pub const Z_NEAR: f32 = 0.1;
     pub const Z_FAR: f32 = 100.0;
 
-    // TODO: Split camera and player controllers
-    pub fn new(width: u32, height: u32) -> Self {
+    // TODO: Split camera and player logic
+    pub fn new(aspect: f32) -> Self {
         Self {
             position: Self::DEFAULT_POSITION,
             target: Self::DEFAULT_TARGET,
             yaw: Self::DEFAULT_YAW.to_radians(),
             pitch: Self::DEFAULT_PITCH.to_radians(),
-            aspect: width as f32 / height as f32,
+            aspect,
             mode: CameraMode::default(),
             fov: Self::DEFAULT_FOV,
             near: Self::Z_NEAR,
@@ -180,7 +89,7 @@ impl Camera {
     /// Calculate camera view matrix
     ///
     /// Camera view matrix moves the world to be at the position and rotation of the camera
-    pub fn camera_mat(&self) -> Matrix4 {
+    pub fn view_mat(&self) -> Matrix4 {
         match self.mode {
             CameraMode::ThirdPerson { .. } => {
                 Matrix4::look_at_lh(self.position, self.target, Float32x3::Y)
@@ -204,11 +113,6 @@ impl Camera {
         //     Float32x4::new(s.z, u.z, f.z, 0.0),
         //     Float32x4::new(-s.dot(self.position), -u.dot(self.position), -f.dot(self.position), 1.0),
         // )
-    }
-
-    /// Create camera uniform matrix to send to shader
-    pub fn uniform(&self) -> CameraUniform {
-        CameraUniform::new((self.proj_mat() * self.camera_mat()).to_cols_array_2d())
     }
 }
 

@@ -6,17 +6,34 @@ use wgpu::{Device, ShaderModule, ShaderModuleDescriptor};
 /// Consts for declaring shaders
 pub trait Shader {
     const DESCRIPTOR: ShaderModuleDescriptor<'static>;
-}
 
-// Stores shader module
-pub struct ShaderStore(pub ShaderModule);
-
-impl ShaderStore {
-    pub fn new<T: Shader>(device: &Device) -> Self {
-        Self(device.create_shader_module(T::DESCRIPTOR))
+    fn init(device: &Device) -> ShaderModule {
+        device.create_shader_module(Self::DESCRIPTOR)
     }
 }
 
+/// Stores all shaders
+pub struct ShaderModules {
+    pub terrain: ShaderModule,
+    pub figure: ShaderModule,
+}
+
+impl ShaderModules {
+    pub fn init_all(device: &Device) -> Self {
+        Self {
+            terrain: TerrainShader::init(device),
+            figure: FigureShader::init(device),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Pipeline Shaders
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+// TODO: Load shaders from assets
+
+/// Terrain pipeline shader
 pub struct TerrainShader;
 
 impl Shader for TerrainShader {
@@ -28,6 +45,7 @@ impl Shader for TerrainShader {
     };
 }
 
+/// Figure pipeline shader
 pub struct FigureShader;
 
 impl Shader for FigureShader {
