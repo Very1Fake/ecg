@@ -5,13 +5,13 @@ use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout
 
 use crate::{
     render::buffer::Bufferable,
-    types::{Float32x3, Matrix4, Rotation},
+    types::{F32x3, Matrix4, Rotation},
 };
 
 /// Represents instance options
 pub struct Instance {
     // Position of the instance in the world
-    pub position: Float32x3,
+    pub position: F32x3,
     // Rotation of the instance
     pub rotation: Rotation,
 }
@@ -21,7 +21,7 @@ impl Bufferable for Instance {
 }
 
 impl Instance {
-    pub fn new(position: Float32x3, rotation: Rotation) -> Self {
+    pub fn new(position: F32x3, rotation: Rotation) -> Self {
         Self { position, rotation }
     }
 

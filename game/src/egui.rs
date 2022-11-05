@@ -1,5 +1,7 @@
 // TODO: Make crate from this module
 
+use std::time::Instant;
+
 use egui::{
     global_dark_light_mode_switch, Context, FontDefinitions, Style, TopBottomPanel, Window,
 };
@@ -12,15 +14,15 @@ use crate::{
         camera::{Camera, CameraMode},
         Scene,
     },
-    types::Event,
+    types::WEvent,
 };
 
 /// Handles everything related to debug overlay drawing
 pub struct DebugOverlay {
     // Inner state
-    pub enabled: bool,
     pub platform: Platform,
     state: DebugOverlayState,
+    time: Instant,
 }
 
 impl DebugOverlay {
@@ -28,7 +30,6 @@ impl DebugOverlay {
         let size = window.inner_size();
 
         Self {
-            enabled: false,
             platform: Platform::new(PlatformDescriptor {
                 physical_width: size.width,
                 physical_height: size.height,
@@ -37,55 +38,49 @@ impl DebugOverlay {
                 style: Style::default(),
             }),
             state: DebugOverlayState::default(),
+            time: Instant::now(),
         }
     }
 
-    #[inline]
-    pub fn toggle(&mut self) {
-        self.enabled = !self.enabled
-    }
-
-    pub fn event(&mut self, event: &Event, paused: bool) {
-        if self.enabled {
-            if let Event::WindowEvent {
-                event: window_event,
-                ..
-            } = &event
-            {
-                match window_event {
-                    WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
-                        self.platform.handle_event(event)
-                    }
-                    WindowEvent::ReceivedCharacter(_)
-                    | WindowEvent::KeyboardInput { .. }
-                    | WindowEvent::ModifiersChanged(_)
-                    | WindowEvent::CursorMoved { .. }
-                    | WindowEvent::CursorEntered { .. }
-                    | WindowEvent::CursorLeft { .. }
-                    | WindowEvent::MouseWheel { .. }
-                    | WindowEvent::MouseInput { .. }
-                    | WindowEvent::Touch(_)
-                        if paused =>
-                    {
-                        self.platform.handle_event(event)
-                    }
-                    _ => {}
+    pub fn handle_event(&mut self, event: &WEvent, cursor_grubbed: bool) -> bool {
+        if let WEvent::WindowEvent {
+            event: window_event,
+            ..
+        } = &event
+        {
+            match window_event {
+                WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => {
+                    self.platform.handle_event(event)
                 }
+                WindowEvent::ReceivedCharacter(_)
+                | WindowEvent::KeyboardInput { .. }
+                | WindowEvent::ModifiersChanged(_)
+                | WindowEvent::CursorMoved { .. }
+                | WindowEvent::CursorEntered { .. }
+                | WindowEvent::CursorLeft { .. }
+                | WindowEvent::MouseWheel { .. }
+                | WindowEvent::MouseInput { .. }
+                | WindowEvent::Touch(_)
+                    if !cursor_grubbed =>
+                {
+                    self.platform.handle_event(event)
+                }
+                _ => {}
             }
         }
+
+        self.platform.captures_event(event)
     }
 
-    pub fn update(&mut self, elapsed: f64, payload: DebugPayload) {
+    pub fn update(&mut self, payload: DebugPayload) {
         // Update internal egui time (used for animations)
-        self.platform.update_time(elapsed);
+        self.platform.update_time(self.time.elapsed().as_secs_f64());
 
-        if self.enabled {
-            // Begin frame
-            self.platform.begin_frame();
+        // Begin frame
+        self.platform.begin_frame();
 
-            // Draw UI
-            self.state.draw(&self.platform.context(), payload);
-        }
+        // Draw UI
+        self.state.draw(&self.platform.context(), payload);
     }
 }
 

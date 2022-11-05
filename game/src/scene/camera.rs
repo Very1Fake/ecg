@@ -1,8 +1,8 @@
 use std::time::Duration;
 
-use winit::event::{ElementState, MouseScrollDelta, VirtualKeyCode};
+use winit::event::{ElementState, VirtualKeyCode};
 
-use crate::types::{Float32x3, Matrix4, Rad};
+use crate::types::{F32x2, F32x3, Matrix4, Rad};
 
 /// Represents camera mode
 #[derive(Debug)]
@@ -30,9 +30,9 @@ impl Default for CameraMode {
 #[derive(Debug)]
 pub struct Camera {
     /// Eye position
-    pub position: Float32x3,
+    pub position: F32x3,
     /// Position of the target
-    pub target: Float32x3,
+    pub target: F32x3,
 
     pub yaw: f32,
     pub pitch: f32,
@@ -51,8 +51,8 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub const DEFAULT_POSITION: Float32x3 = Float32x3::new(0.0, 0.5, 5.0);
-    pub const DEFAULT_TARGET: Float32x3 = Float32x3::ZERO;
+    pub const DEFAULT_POSITION: F32x3 = F32x3::new(0.0, 0.5, 5.0);
+    pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
     pub const DEFAULT_YAW: f32 = -90.0;
     pub const DEFAULT_PITCH: f32 = 15.0;
     pub const DEFAULT_FOV: f32 = 45.0;
@@ -92,7 +92,7 @@ impl Camera {
     pub fn view_mat(&self) -> Matrix4 {
         match self.mode {
             CameraMode::ThirdPerson { .. } => {
-                Matrix4::look_at_lh(self.position, self.target, Float32x3::Y)
+                Matrix4::look_at_lh(self.position, self.target, F32x3::Y)
             }
         }
 
@@ -131,10 +131,9 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    pub const SPEED: f32 = 2.0;
-    pub const SCROLL_SENSITIVITY: f32 = 0.5;
-    pub const MIN_DISTANCE: f32 = 0.5;
-    pub const SAFE_PITCH: f32 = 1.57;
+    const SPEED: f32 = 2.0;
+    const MIN_DISTANCE: f32 = 0.5;
+    const SAFE_PITCH: f32 = 1.57;
 
     /// Resets camera controller inputs
     pub fn reset(&mut self) {
@@ -176,20 +175,16 @@ impl CameraController {
     }
 
     /// Processes input from mouse
-    pub fn mouse_move(&mut self, delta: (f64, f64)) {
+    pub fn mouse_move(&mut self, delta: F32x2) {
         // Yaw angle
-        self.horizontal = delta.0 as f32;
+        self.horizontal = delta.x as f32;
         // Pitch angle
-        self.vertical = delta.1 as f32;
+        self.vertical = delta.y as f32;
     }
 
     /// Processes input from mouse wheel
-    pub fn mouse_wheel(&mut self, delta: MouseScrollDelta) {
-        self.zoom = match delta {
-            // Assume 1 line is 10 pixels
-            MouseScrollDelta::LineDelta(_, y) => y * 10.0 * Self::SCROLL_SENSITIVITY,
-            MouseScrollDelta::PixelDelta(position) => position.y as f32,
-        };
+    pub fn mouse_wheel(&mut self, delta: f32) {
+        self.zoom = delta;
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, duration: Duration) {
@@ -201,9 +196,9 @@ impl CameraController {
                 // Target forward/right vector
                 let (forward, right, length) = {
                     let forward = camera.target - camera.position;
-                    let right = forward.normalize().cross(Float32x3::Y);
+                    let right = forward.normalize().cross(F32x3::Y);
 
-                    (Float32x3::Y.cross(right), right, forward.length())
+                    (F32x3::Y.cross(right), right, forward.length())
                 };
 
                 // Zoom in/out

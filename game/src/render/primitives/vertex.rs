@@ -3,15 +3,15 @@ use std::mem::size_of;
 use bytemuck::{Pod, Zeroable};
 use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout, VertexStepMode};
 
-use crate::{render::buffer::Bufferable, test_buffer_align, types::Float32x3};
+use crate::{render::buffer::Bufferable, test_buffer_align, types::F32x3};
 
 // TODO: Make separate vertex structs for each pipeline
 /// Represents vertex data sent to vertex buffer
 #[repr(C)]
 #[derive(Pod, Zeroable, Copy, Clone, Debug)]
 pub struct Vertex {
-    pub position: Float32x3,
-    pub color: Float32x3,
+    pub position: F32x3,
+    pub color: F32x3,
 }
 
 impl Bufferable for Vertex {
@@ -24,15 +24,15 @@ impl Vertex {
     #[rustfmt::skip]
     pub const PYRAMID: &'static [Self] = &[
         // Top point of pyramid
-        Self::new(Float32x3::new(0.0, 0.0, 0.0), Float32x3::new(1.0, 1.0, 1.0)),
+        Self::new(F32x3::new(0.0, 0.0, 0.0), F32x3::new(1.0, 1.0, 1.0)),
         // Left near point of pyramid 
-        Self::new(Float32x3::new(-0.5, -0.5, -0.5), Float32x3::new(0.0, 1.0, 0.0)),
+        Self::new(F32x3::new(-0.5, -0.5, -0.5), F32x3::new(0.0, 1.0, 0.0)),
         // Left far point of pyramid 
-        Self::new(Float32x3::new(-0.5, -0.5, 0.5), Float32x3::new(0.0, 0.0, 1.0)),
+        Self::new(F32x3::new(-0.5, -0.5, 0.5), F32x3::new(0.0, 0.0, 1.0)),
         // Right near point of pyramid 
-        Self::new(Float32x3::new(0.5, -0.5, -0.5), Float32x3::new(1.0, 1.0, 0.0)),
+        Self::new(F32x3::new(0.5, -0.5, -0.5), F32x3::new(1.0, 1.0, 0.0)),
         // Right far point of pyramid
-        Self::new(Float32x3::new(0.5, -0.5, 0.5), Float32x3::new(1.0, 0.0, 0.0)),
+        Self::new(F32x3::new(0.5, -0.5, 0.5), F32x3::new(1.0, 0.0, 0.0)),
     ];
 
     #[rustfmt::skip]
@@ -54,7 +54,7 @@ impl Vertex {
     };
 
     #[inline]
-    pub const fn new(position: Float32x3, color: Float32x3) -> Self {
+    pub const fn new(position: F32x3, color: F32x3) -> Self {
         Self { position, color }
     }
 }

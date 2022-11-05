@@ -1,8 +1,10 @@
 use std::time::Duration;
 
 use wgpu::BufferUsages;
+use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
+    game::Game,
     render::{
         buffer::{Buffer, DynamicBuffer},
         pipelines::{GlobalModel, Globals, GlobalsBindGroup},
@@ -10,9 +12,13 @@ use crate::{
             instance::{Instance, RawInstance},
             vertex::Vertex,
         },
-        renderer::{drawer::FirstPassDrawer, Renderer},
+        renderer::drawer::FirstPassDrawer,
     },
-    types::{Float32x3, Rotation},
+    types::{F32x3, Rotation},
+    window::{
+        event::{Event, Input},
+        Window,
+    },
 };
 
 use self::{
@@ -40,11 +46,20 @@ pub struct Scene {
     pub voxel: Voxel,
     pub voxel_instance: Instance,
     pub voxel_instance_buffer: DynamicBuffer<RawInstance>,
+
+    // UI
+    force_cursor_grub: bool,
+
+    #[cfg(feature = "debug_overlay")]
+    pub show_overlay: bool,
 }
 
 impl Scene {
     /// Create new `Scene`
-    pub fn new(renderer: &mut Renderer) -> Self {
+    pub fn new(window: &mut Window) -> Self {
+        window.grab_cursor(true);
+        let renderer = window.renderer_mut();
+
         let resolution = renderer.resolution();
 
         let model = GlobalModel {
@@ -53,7 +68,7 @@ impl Scene {
 
         let globals_bind_group = renderer.bind_globals(&model);
 
-        let voxel_instance = Instance::new(Float32x3::ZERO, Rotation::IDENTITY);
+        let voxel_instance = Instance::new(F32x3::ZERO, Rotation::IDENTITY);
         let voxel_instance_buffer = DynamicBuffer::new(&renderer.device, 1, BufferUsages::VERTEX);
         voxel_instance_buffer.update(&renderer.queue, &[voxel_instance.as_raw()], 0);
 
@@ -70,22 +85,75 @@ impl Scene {
             voxel: Voxel::new(&renderer.device),
             voxel_instance,
             voxel_instance_buffer,
+
+            force_cursor_grub: true,
+
+            #[cfg(feature = "debug_overlay")]
+            show_overlay: false,
         }
     }
 
-    pub fn update(&mut self, renderer: &mut Renderer, tick_dur: Duration) {
+    fn toggle_cursor_grub(&mut self) {
+        self.force_cursor_grub = !self.force_cursor_grub;
+        self.camera_controller.reset();
+    }
+
+    /// Update scene state. Return `false` if should close the game
+    pub fn update(&mut self, game: &mut Game, events: Vec<Event>, tick_dur: Duration) -> bool {
+        let mut exit = false;
+
+        // Handle events
+        events.into_iter().for_each(|event| match event {
+            Event::Close => exit = true,
+            Event::Resize(size) => self.camera.aspect = size.x as f32 / size.y as f32,
+            // FIX: Abnormal touchpad sensitivity
+            Event::MouseMove(delta, true) => self.camera_controller.mouse_move(delta),
+            Event::Zoom(delta, true) => self.camera_controller.mouse_wheel(delta),
+            Event::Input(Input::Key(key), state) => {
+                match key {
+                    VirtualKeyCode::Escape => exit = true,
+                    VirtualKeyCode::P if matches!(state, ElementState::Released) => {
+                        self.toggle_cursor_grub()
+                    }
+                    #[cfg(feature = "debug_overlay")]
+                    VirtualKeyCode::F3 if matches!(state, ElementState::Released) => {
+                        self.show_overlay = !self.show_overlay
+                    }
+                    _ => {}
+                }
+
+                if self.force_cursor_grub {
+                    self.camera_controller.virtual_key(key, state);
+                }
+            }
+            Event::Focused(focused) => self.force_cursor_grub = focused,
+            _ => {}
+        });
+
+        // Update debug overlay
+        #[cfg(feature = "debug_overlay")]
+        game.debug_overlay.update(crate::egui::DebugPayload {
+            scene: self,
+            renderer: game.window.renderer(),
+        });
+
         // Update camera
         self.camera_controller
             .update_camera(&mut self.camera, tick_dur);
-        renderer.update_consts(
+        game.window.renderer().update_consts(
             &self.model.globals,
             &[Globals::new(self.camera.proj_mat(), self.camera.view_mat())],
         );
 
         // Update voxel position
         self.voxel_instance.position = self.camera.target;
-        renderer
+        game.window
+            .renderer()
             .update_dynamic_buffer(&self.voxel_instance_buffer, &[self.voxel_instance.as_raw()]);
+
+        game.window.grab_cursor(self.force_cursor_grub);
+
+        exit
     }
 
     /// Draw in-game objects

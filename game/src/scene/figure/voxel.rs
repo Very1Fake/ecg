@@ -9,7 +9,7 @@ use crate::{
         model::Model,
         primitives::{direction::Direction, quad::Quad, vertex::Vertex},
     },
-    types::Float32x3,
+    types::F32x3,
 };
 
 pub struct Voxel {
@@ -23,13 +23,13 @@ impl Voxel {
         let vertices: Vec<Vertex> = Direction::ALL
             .into_iter()
             .flat_map(|dir| {
-                Quad::new(dir, Float32x3::ZERO)
+                Quad::new(dir, F32x3::ZERO)
                     .corners()
                     .into_iter()
                     .map(|position| Vertex {
                         // Rescale
                         position: position * 0.1,
-                        color: Float32x3::ZERO,
+                        color: F32x3::ZERO,
                     })
             })
             .collect();

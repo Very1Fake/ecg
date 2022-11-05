@@ -1,4 +1,4 @@
-use crate::types::Float32x3;
+use crate::types::F32x3;
 
 use super::direction::Direction;
 
@@ -8,21 +8,21 @@ pub const HALF_SIZE: f32 = 0.5;
 #[derive(Debug)]
 pub struct Quad {
     pub direction: Direction,
-    pub position: Float32x3,
+    pub position: F32x3,
 }
 
 impl Quad {
-    pub const LEFT_UP_FRONT: Float32x3 = Float32x3::new(-HALF_SIZE, HALF_SIZE, -HALF_SIZE);
-    pub const LEFT_UP_BACK: Float32x3 = Float32x3::new(-HALF_SIZE, HALF_SIZE, HALF_SIZE);
-    pub const LEFT_DOWN_FRONT: Float32x3 = Float32x3::new(-HALF_SIZE, -HALF_SIZE, -HALF_SIZE);
-    pub const LEFT_DOWN_BACK: Float32x3 = Float32x3::new(-HALF_SIZE, -HALF_SIZE, HALF_SIZE);
+    pub const LEFT_UP_FRONT: F32x3 = F32x3::new(-HALF_SIZE, HALF_SIZE, -HALF_SIZE);
+    pub const LEFT_UP_BACK: F32x3 = F32x3::new(-HALF_SIZE, HALF_SIZE, HALF_SIZE);
+    pub const LEFT_DOWN_FRONT: F32x3 = F32x3::new(-HALF_SIZE, -HALF_SIZE, -HALF_SIZE);
+    pub const LEFT_DOWN_BACK: F32x3 = F32x3::new(-HALF_SIZE, -HALF_SIZE, HALF_SIZE);
 
-    pub const RIGHT_UP_FRONT: Float32x3 = Float32x3::new(HALF_SIZE, HALF_SIZE, -HALF_SIZE);
-    pub const RIGHT_UP_BACK: Float32x3 = Float32x3::new(HALF_SIZE, HALF_SIZE, HALF_SIZE);
-    pub const RIGHT_DOWN_FRONT: Float32x3 = Float32x3::new(HALF_SIZE, -HALF_SIZE, -HALF_SIZE);
-    pub const RIGHT_DOWN_BACK: Float32x3 = Float32x3::new(HALF_SIZE, -HALF_SIZE, HALF_SIZE);
+    pub const RIGHT_UP_FRONT: F32x3 = F32x3::new(HALF_SIZE, HALF_SIZE, -HALF_SIZE);
+    pub const RIGHT_UP_BACK: F32x3 = F32x3::new(HALF_SIZE, HALF_SIZE, HALF_SIZE);
+    pub const RIGHT_DOWN_FRONT: F32x3 = F32x3::new(HALF_SIZE, -HALF_SIZE, -HALF_SIZE);
+    pub const RIGHT_DOWN_BACK: F32x3 = F32x3::new(HALF_SIZE, -HALF_SIZE, HALF_SIZE);
 
-    pub fn new(direction: Direction, position: Float32x3) -> Self {
+    pub fn new(direction: Direction, position: F32x3) -> Self {
         Self {
             direction,
             position,
@@ -30,7 +30,7 @@ impl Quad {
     }
 
     /// Get quad corners (vertices positions)
-    pub fn corners(&self) -> [Float32x3; 4] {
+    pub fn corners(&self) -> [F32x3; 4] {
         let pos = self.position;
 
         match self.direction {

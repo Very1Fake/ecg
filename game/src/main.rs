@@ -1,11 +1,11 @@
 #![windows_subsystem = "windows"]
 
 pub mod bootstrap;
+pub mod consts;
 #[cfg(feature = "debug_overlay")]
 pub mod egui;
 pub mod game;
 pub mod render;
-pub mod run;
 pub mod scene;
 pub mod types;
 pub mod utils;
@@ -16,9 +16,8 @@ use tokio::runtime::Builder;
 use tracing::{debug, info};
 
 use bootstrap::bootstrap;
-use run::run;
 
-use crate::{game::Game, render::renderer::Renderer, utils::VERSION, window::Window};
+use crate::{game::Game, utils::VERSION, window::Window};
 
 // TODO: Drop anyhow
 fn main() -> Result<()> {
@@ -30,14 +29,13 @@ fn main() -> Result<()> {
         .worker_threads(2)
         .max_blocking_threads(8)
         .build()?;
-    let (window, event_loop) = Window::new().with_context(|| "While creating game window")?;
+    let (window, event_loop) =
+        Window::new(&runtime).with_context(|| "While creating game window")?;
 
-    let renderer = Renderer::new(&window.inner, &runtime)?;
-
-    let game = Game::new(&window, renderer);
+    let game = Game::new(window, runtime);
 
     debug!("Game starts");
-    runtime.block_on(run(event_loop, window, game))?;
+    game.run(event_loop)?;
 
     Ok(())
 }

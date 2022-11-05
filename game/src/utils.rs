@@ -36,8 +36,7 @@ macro_rules! test_buffer_align {
         fn test_alignment() {
             assert_eq!(core::mem::size_of::<$test_type>() % 8, 0);
         }
-    };
-    // ($test_type:ty) => {
-    //     test_buffer_align
-    // };
+    }; // ($test_type:ty) => {
+       //     test_buffer_align
+       // };
 }
