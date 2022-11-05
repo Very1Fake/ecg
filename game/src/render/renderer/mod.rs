@@ -1,4 +1,3 @@
-use anyhow::{bail, Result};
 use bytemuck::Pod;
 use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
@@ -60,7 +59,7 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window: &Window, runtime: &Runtime) -> Result<Self> {
+    pub fn new(window: &Window, runtime: &Runtime) -> Result<Self, RenderError> {
         let size = window.inner_size();
         // TODO: Parse backend from env
         let backend = Backends::PRIMARY;
@@ -244,7 +243,7 @@ impl Renderer {
     pub fn start_frame<'a>(
         &'a mut self,
         globals: &'a GlobalsBindGroup,
-    ) -> Result<Option<Drawer<'a>>> {
+    ) -> Result<Option<Drawer<'a>>, RenderError> {
         if self.is_minimized {
             return Ok(None);
         }
@@ -259,6 +258,7 @@ impl Renderer {
         // The current frame texture to draw
         let texture = match self.surface.get_current_texture() {
             Ok(tex) => tex,
+            // If surface lost or outdated, try to recover it by reconfiguring
             Err(err @ (SurfaceError::Lost | SurfaceError::Outdated)) => {
                 warn!("{} Recreating surface (frame will be missed)", err);
                 self.on_resize(self.resolution);
@@ -268,10 +268,7 @@ impl Renderer {
                 // This will be resolved on the next frame
                 return Ok(None);
             }
-            Err(err @ SurfaceError::OutOfMemory) => {
-                // If surface lost, try to recover it by reconfiguring
-                bail!(err)
-            }
+            Err(err) => return Err(err.into()),
         };
 
         Ok(Some(Drawer::new(encoder, self, texture, globals)))

@@ -1,6 +1,5 @@
 use std::mem::replace;
 
-use anyhow::Context;
 use tracing::debug;
 use winit::{
     dpi::PhysicalSize,
@@ -63,9 +62,9 @@ impl Window {
             } => {
                 match input.virtual_keycode {
                     // Ignore synthetic Tab presses from alt-tabbing
-                    Some(VirtualKeyCode::Tab) if is_synthetic => return,
+                    Some(VirtualKeyCode::Tab) if is_synthetic => {}
                     // Ignore synthetic Alt-F4
-                    Some(VirtualKeyCode::F4) if self.modifiers.alt() => return,
+                    Some(VirtualKeyCode::F4) if self.modifiers.alt() => {}
                     Some(VirtualKeyCode::F11) if matches!(input.state, ElementState::Released) => {
                         self.toggle_fullscreen = true
                     }
@@ -98,13 +97,11 @@ impl Window {
     }
 
     pub fn handle_device_event(&mut self, event: DeviceEvent) {
-        match event {
-            // TODO: Add sensitivity settings
-            DeviceEvent::MouseMotion { delta } => self.events.push(Event::MouseMove(
+        if let DeviceEvent::MouseMotion { delta } = event {
+            self.events.push(Event::MouseMove(
                 F32x2::new(delta.0 as f32, delta.1 as f32),
                 self.cursor_grabbed,
-            )),
-            _ => {}
+            ))
         }
     }
 
@@ -137,8 +134,7 @@ impl Window {
                     let mut modes = self
                         .inner
                         .primary_monitor()
-                        .context("Can't identify primary monitor")
-                        .unwrap()
+                        .expect("Can't identify primary monitor")
                         .video_modes()
                         .collect::<Vec<_>>();
 
@@ -148,10 +144,7 @@ impl Window {
                         size.height * size.width
                     });
 
-                    let mode = modes
-                        .last()
-                        .context("Proper fullscreen mode not found")
-                        .unwrap();
+                    let mode = modes.last().expect("Proper fullscreen mode not found");
 
                     debug!(
                         size = ?mode.size(),

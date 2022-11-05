@@ -17,9 +17,8 @@ use super::Renderer;
 
 #[cfg(feature = "debug_overlay")]
 use {
-    anyhow::{Context, Result},
     egui::FullOutput,
-    egui_wgpu_backend::ScreenDescriptor,
+    egui_wgpu_backend::{BackendError, ScreenDescriptor},
     egui_winit_platform::Platform,
     wgpu::{Device, SurfaceConfiguration},
 };
@@ -124,9 +123,14 @@ impl<'frame> Drawer<'frame> {
     // FIX: Handle egui textures better
     /// Draw debug overlay
     #[cfg(feature = "debug_overlay")]
-    pub fn draw_debug_overlay(&mut self, platform: &mut Platform, scale_factor: f32) -> Result<()> {
+    pub fn draw_debug_overlay(
+        &mut self,
+        platform: &mut Platform,
+        scale_factor: f32,
+    ) -> Result<(), BackendError> {
         // Finalize frame
         // FIX: Fixes cursor flickering, but cursor icons won't change
+
         let FullOutput {
             textures_delta,
             shapes,
@@ -143,10 +147,11 @@ impl<'frame> Drawer<'frame> {
         };
 
         // Send textures and update buffers
-        self.renderer
-            .egui_render_pass
-            .add_textures(self.renderer.device, self.renderer.queue, &textures_delta)
-            .context("While uploading UI texture")?;
+        self.renderer.egui_render_pass.add_textures(
+            self.renderer.device,
+            self.renderer.queue,
+            &textures_delta,
+        )?;
         self.renderer.egui_render_pass.update_buffers(
             self.renderer.device,
             self.renderer.queue,
@@ -155,16 +160,13 @@ impl<'frame> Drawer<'frame> {
         );
 
         // Record all commands to encoder
-        self.renderer
-            .egui_render_pass
-            .execute(
-                self.encoder.as_mut().unwrap(),
-                &self.output_view,
-                &paint_jobs,
-                screen_descriptor,
-                None,
-            )
-            .context("While executing ui commands")?;
+        self.renderer.egui_render_pass.execute(
+            self.encoder.as_mut().unwrap(),
+            &self.output_view,
+            &paint_jobs,
+            screen_descriptor,
+            None,
+        )?;
 
         // Cleanup egui textures
         self.renderer
@@ -221,7 +223,7 @@ impl<'pass> FirstPassDrawer<'pass> {
         self.render_pass
             .set_vertex_buffer(0, model.get_vertices().slice(..));
         self.render_pass
-            .set_vertex_buffer(1, (*instances).buffer.slice(..));
+            .set_vertex_buffer(1, instances.buffer.slice(..));
         self.render_pass
             .set_index_buffer(index_buffer.slice(..), IndexFormat::Uint16);
         // TODO: Make safe cast

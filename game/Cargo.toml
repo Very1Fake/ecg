@@ -13,7 +13,6 @@ default = ["debug_overlay"]
 debug_overlay = ["egui", "egui_winit_platform", "egui_wgpu_backend"]
 
 [dependencies]
-anyhow = "1.0"
 bytemuck = { version = "1.12", features = ["derive"] }
 glam = { version = "0.22", features = ["bytemuck"] }
 thiserror = "1.0"

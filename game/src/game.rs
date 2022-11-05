@@ -1,6 +1,5 @@
 use std::time::Instant;
 
-use anyhow::Result;
 use tokio::runtime::Runtime;
 use tracing::{debug, debug_span, info};
 use winit::{event::WindowEvent, event_loop::ControlFlow};
@@ -97,7 +96,7 @@ impl Game {
         // TODO: Sleep here
     }
 
-    pub fn run(mut self, event_loop: EventLoop) -> Result<()> {
+    pub fn run(mut self, event_loop: EventLoop) {
         // TODO: PlayStates
         debug!("Initializing game scene");
         let mut scene = Scene::new(&mut self.window);
@@ -110,13 +109,12 @@ impl Game {
             #[cfg(feature = "debug_overlay")]
             {
                 // Let debug UI handle occurred event, if cursor detached from camera
-                if scene.show_overlay {
-                    if self
+                if scene.show_overlay
+                    && self
                         .debug_overlay
                         .handle_event(&event, self.window.cursor_grabbed())
-                    {
-                        return;
-                    }
+                {
+                    return;
                 }
             }
 
