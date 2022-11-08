@@ -22,7 +22,7 @@ use crate::{
 };
 
 use self::{
-    camera::{Camera, CameraController},
+    camera::{Camera, CameraController, CameraMode},
     figure::voxel::Voxel,
 };
 
@@ -146,10 +146,13 @@ impl Scene {
         );
 
         // Update voxel position
-        self.voxel_instance.position = self.camera.target;
-        game.window
-            .renderer()
-            .update_dynamic_buffer(&self.voxel_instance_buffer, &[self.voxel_instance.as_raw()]);
+        if let CameraMode::ThirdPerson { target, .. } = self.camera.mode {
+            self.voxel_instance.position = target;
+            game.window.renderer().update_dynamic_buffer(
+                &self.voxel_instance_buffer,
+                &[self.voxel_instance.as_raw()],
+            );
+        }
 
         game.window.grab_cursor(self.force_cursor_grub);
 

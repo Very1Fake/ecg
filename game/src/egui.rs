@@ -116,11 +116,11 @@ impl DebugOverlayState {
                     }
                     if menu.button("Reset").clicked() {
                         match &mut payload.scene.camera.mode {
-                            CameraMode::ThirdPerson { distance } => {
-                                *distance = CameraMode::DEFAULT_DISTANCE
+                            CameraMode::ThirdPerson { target, distance } => {
+                                *target = CameraMode::DEFAULT_TARGET;
+                                *distance = CameraMode::DEFAULT_DISTANCE;
                             }
                         }
-                        payload.scene.camera.target = Camera::DEFAULT_TARGET;
                         payload.scene.camera.yaw = Camera::DEFAULT_YAW.to_radians();
                         payload.scene.camera.pitch = Camera::DEFAULT_PITCH.to_radians();
                     }
@@ -146,21 +146,20 @@ impl DebugOverlayState {
             .show(ctx, |ui| {
                 ui.label(format!(
                     "Position: x:{:.3} y:{:.3} z:{:.3}\n\
-                    Target: x:{:.3} y:{:.3} z:{:.3}\n\
                     Yaw: {:.3} ({:.2})\n\
-                    Pitch: {:.3} ({:.2})",
+                    Pitch: {:.3} ({:.2})\n\
+                    FOV: {:.3} {:.2}",
                     payload.scene.camera.position.x,
                     payload.scene.camera.position.y,
                     payload.scene.camera.position.z,
-                    payload.scene.camera.target.x,
-                    payload.scene.camera.target.y,
-                    payload.scene.camera.target.z,
                     payload.scene.camera.yaw,
                     payload.scene.camera.yaw.to_degrees(),
                     payload.scene.camera.pitch,
                     payload.scene.camera.pitch.to_degrees(),
+                    payload.scene.camera.fov,
+                    payload.scene.camera.fov.to_degrees(),
                 ));
-                ui.label(format!("{:?}", payload.scene.camera.mode))
+                ui.label(format!("{:#?}", payload.scene.camera.mode))
             });
     }
 }

@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{f32::consts::FRAC_PI_2, time::Duration};
 
 use winit::event::{ElementState, VirtualKeyCode};
 
@@ -9,18 +9,22 @@ use crate::types::{F32x2, F32x3, Matrix4, Rad};
 pub enum CameraMode {
     // TODO: FirstPerson
     ThirdPerson {
+        /// Position of the target
+        target: F32x3,
         // Distance between camera and target
         distance: f32,
     },
 }
 
 impl CameraMode {
+    pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
     pub const DEFAULT_DISTANCE: f32 = 2.5;
 }
 
 impl Default for CameraMode {
     fn default() -> Self {
         Self::ThirdPerson {
+            target: Self::DEFAULT_TARGET,
             distance: Self::DEFAULT_DISTANCE,
         }
     }
@@ -31,8 +35,6 @@ impl Default for CameraMode {
 pub struct Camera {
     /// Eye position
     pub position: F32x3,
-    /// Position of the target
-    pub target: F32x3,
 
     pub yaw: f32,
     pub pitch: f32,
@@ -52,7 +54,6 @@ pub struct Camera {
 
 impl Camera {
     pub const DEFAULT_POSITION: F32x3 = F32x3::new(0.0, 0.5, 5.0);
-    pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
     pub const DEFAULT_YAW: f32 = -90.0;
     pub const DEFAULT_PITCH: f32 = 15.0;
     pub const DEFAULT_FOV: f32 = 45.0;
@@ -63,12 +64,11 @@ impl Camera {
     pub fn new(aspect: f32) -> Self {
         Self {
             position: Self::DEFAULT_POSITION,
-            target: Self::DEFAULT_TARGET,
             yaw: Self::DEFAULT_YAW.to_radians(),
             pitch: Self::DEFAULT_PITCH.to_radians(),
             aspect,
             mode: CameraMode::default(),
-            fov: Self::DEFAULT_FOV,
+            fov: Self::DEFAULT_FOV.to_radians(),
             near: Self::Z_NEAR,
             far: Self::Z_FAR,
         }
@@ -91,49 +91,31 @@ impl Camera {
     /// Camera view matrix moves the world to be at the position and rotation of the camera
     pub fn view_mat(&self) -> Matrix4 {
         match self.mode {
-            CameraMode::ThirdPerson { .. } => {
-                Matrix4::look_at_lh(self.position, self.target, F32x3::Y)
+            CameraMode::ThirdPerson { target, .. } => {
+                Matrix4::look_at_lh(self.position, target, F32x3::Y)
             }
         }
-
-        // First person camera matrix
-        // Matrix4::look_at_rh(
-        //     self.position,
-        //     Float32x3::new(self.yaw.sin(), self.pitch.sin(), self.yaw.sin()).normalize(),
-        //     Float32x3::Y,
-        // )
-
-        // Copy of private `Mat4::look_at_lh`
-        // let f = Float32x3::new(self.yaw.sin(), self.pitch.sin(), self.yaw.sin()).normalize();
-        // let s = Float32x3::Y.cross(f).normalize();
-        // let u = f.cross(s);
-        // Matrix4::from_cols(
-        //     Float32x4::new(s.x, u.x, f.x, 0.0),
-        //     Float32x4::new(s.y, u.y, f.y, 0.0),
-        //     Float32x4::new(s.z, u.z, f.z, 0.0),
-        //     Float32x4::new(-s.dot(self.position), -u.dot(self.position), -f.dot(self.position), 1.0),
-        // )
     }
 }
 
 #[derive(Debug)]
 pub struct CameraController {
-    pub forward: f32,
-    pub backward: f32,
-    pub left: f32,
-    pub right: f32,
-    pub up: f32,
-    pub down: f32,
-    pub horizontal: f32,
-    pub vertical: f32,
-    pub zoom: f32,
-    pub sensitivity: f32,
+    forward: f32,
+    backward: f32,
+    left: f32,
+    right: f32,
+    up: f32,
+    down: f32,
+    horizontal: f32,
+    vertical: f32,
+    zoom: f32,
+    sensitivity: f32,
 }
 
 impl CameraController {
     const SPEED: f32 = 2.0;
     const MIN_DISTANCE: f32 = 0.5;
-    const SAFE_PITCH: f32 = 1.57;
+    const SAFE_PITCH: f32 = FRAC_PI_2 - 0.01;
 
     /// Resets camera controller inputs
     pub fn reset(&mut self) {
@@ -191,19 +173,30 @@ impl CameraController {
         let duration = duration.as_secs_f32();
         let modifier = Self::SPEED * duration;
 
+        // Apply camera rotation
+        camera.yaw += self.horizontal.to_radians() * self.sensitivity * modifier;
+        camera.pitch += self.vertical.to_radians() * self.sensitivity * modifier;
+
+        // Pitch angle safety
+        if camera.pitch < -Self::SAFE_PITCH {
+            camera.pitch = -Self::SAFE_PITCH;
+        } else if camera.pitch > Self::SAFE_PITCH {
+            camera.pitch = Self::SAFE_PITCH;
+        }
+
+        // Common calculations
+        let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
+        let (pitch_sin, pitch_cos) = camera.pitch.sin_cos();
+        let horizontal_forward = F32x3::new(yaw_sin, 0.0, yaw_cos).normalize();
+        let horizontal_right = horizontal_forward.cross(F32x3::Y);
+
+        // Move camera/target
         match &mut camera.mode {
-            CameraMode::ThirdPerson { distance } => {
-                // Target forward/right vector
-                let (forward, right, length) = {
-                    let forward = camera.target - camera.position;
-                    let right = forward.normalize().cross(F32x3::Y);
-
-                    (F32x3::Y.cross(right), right, forward.length())
-                };
-
+            CameraMode::ThirdPerson { target, distance } => {
                 // Zoom in/out
                 {
-                    let new = -((self.zoom * length * 0.75) * modifier);
+                    let new =
+                        -((self.zoom * (*target - camera.position).length() * 0.75) * modifier);
 
                     if *distance + new > Self::MIN_DISTANCE {
                         *distance += new;
@@ -213,37 +206,23 @@ impl CameraController {
                 }
 
                 // Move forward/backward
-                camera.target += forward * (self.forward - self.backward) * modifier;
+                *target += horizontal_forward * (self.forward - self.backward) * modifier;
                 // Move left/right
-                camera.target += right * (self.left - self.right) * modifier;
+                *target += horizontal_right * (self.left - self.right) * modifier;
                 // Move up/down
-                camera.target.y += (self.up - self.down) * modifier;
-
-                // Rotate camera
-                camera.yaw += self.horizontal.to_radians() * self.sensitivity * modifier;
-                camera.pitch += self.vertical.to_radians() * self.sensitivity * modifier;
-
-                // Pitch angle safety
-                if camera.pitch < -Self::SAFE_PITCH {
-                    camera.pitch = -Self::SAFE_PITCH;
-                } else if camera.pitch > Self::SAFE_PITCH {
-                    camera.pitch = Self::SAFE_PITCH;
-                }
+                target.y += (self.up - self.down) * modifier;
 
                 // Calculate camera position
                 {
-                    let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
-                    let (pitch_sin, pitch_cos) = camera.pitch.sin_cos();
-
                     let hor_dist = *distance * pitch_cos;
                     let vert_dist = *distance * pitch_sin;
 
                     let offset_x = hor_dist * yaw_sin;
                     let offset_z = hor_dist * yaw_cos;
 
-                    camera.position.x = camera.target.x - offset_x;
-                    camera.position.z = camera.target.z - offset_z;
-                    camera.position.y = camera.target.y + vert_dist;
+                    camera.position.x = target.x - offset_x;
+                    camera.position.z = target.z - offset_z;
+                    camera.position.y = target.y + vert_dist;
                 }
 
                 // Reset mouse inputs
