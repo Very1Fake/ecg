@@ -116,6 +116,9 @@ impl DebugOverlayState {
                     }
                     if menu.button("Reset").clicked() {
                         match &mut payload.scene.camera.mode {
+                            CameraMode::FirstPerson { forward } => {
+                                *forward = CameraMode::DEFAULT_FORWARD
+                            }
                             CameraMode::ThirdPerson { target, distance } => {
                                 *target = CameraMode::DEFAULT_TARGET;
                                 *distance = CameraMode::DEFAULT_DISTANCE;

@@ -7,16 +7,20 @@ use crate::types::{F32x2, F32x3, Matrix4, Rad};
 /// Represents camera mode
 #[derive(Debug)]
 pub enum CameraMode {
-    // TODO: FirstPerson
+    FirstPerson {
+        /// Direction which camera is facing
+        forward: F32x3,
+    },
     ThirdPerson {
         /// Position of the target
         target: F32x3,
-        // Distance between camera and target
+        /// Distance between camera and target
         distance: f32,
     },
 }
 
 impl CameraMode {
+    pub const DEFAULT_FORWARD: F32x3 = F32x3::ONE;
     pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
     pub const DEFAULT_DISTANCE: f32 = 2.5;
 }
@@ -91,6 +95,9 @@ impl Camera {
     /// Camera view matrix moves the world to be at the position and rotation of the camera
     pub fn view_mat(&self) -> Matrix4 {
         match self.mode {
+            CameraMode::FirstPerson { forward } => {
+                Matrix4::look_to_lh(self.position, forward, F32x3::Y)
+            }
             CameraMode::ThirdPerson { target, .. } => {
                 Matrix4::look_at_lh(self.position, target, F32x3::Y)
             }
@@ -192,6 +199,20 @@ impl CameraController {
 
         // Move camera/target
         match &mut camera.mode {
+            CameraMode::FirstPerson { forward } => {
+                // Camera rotation
+                *forward = F32x3::new(yaw_sin, -pitch_sin, yaw_cos);
+
+                // Move up/down
+                camera.position.y += (self.up - self.down) * modifier;
+                // Move forward/backward
+                camera.position += horizontal_forward * (self.forward - self.backward) * modifier;
+                // Move left/right
+                camera.position += horizontal_right * (self.left - self.right) * modifier;
+
+                // Change camera FOV
+                camera.fov += self.zoom * 0.5 * modifier;
+            }
             CameraMode::ThirdPerson { target, distance } => {
                 // Zoom in/out
                 {
@@ -224,13 +245,13 @@ impl CameraController {
                     camera.position.z = target.z - offset_z;
                     camera.position.y = target.y + vert_dist;
                 }
-
-                // Reset mouse inputs
-                self.zoom = 0.0;
-                self.horizontal = 0.0;
-                self.vertical = 0.0;
             }
         }
+
+        // Reset mouse inputs
+        self.zoom = 0.0;
+        self.horizontal = 0.0;
+        self.vertical = 0.0;
     }
 }
 
