@@ -4,7 +4,7 @@ use wgpu::BufferUsages;
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
-    game::Game,
+    Game,
     render::{
         buffer::{Buffer, DynamicBuffer},
         pipelines::{GlobalModel, Globals, GlobalsBindGroup},
@@ -133,6 +133,7 @@ impl Scene {
         // Update debug overlay
         #[cfg(feature = "debug_overlay")]
         game.debug_overlay.update(crate::egui::DebugPayload {
+            clock_stats: game.clock.stats(),
             scene: self,
             renderer: game.window.renderer(),
         });

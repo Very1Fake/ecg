@@ -2,6 +2,7 @@
 
 use std::time::Instant;
 
+use common::clock::ClockStats;
 use egui::{
     global_dark_light_mode_switch, Context, FontDefinitions, RadioButton, Style, TopBottomPanel,
     Window,
@@ -86,6 +87,7 @@ impl DebugOverlay {
 }
 
 pub struct DebugPayload<'a> {
+    pub clock_stats: ClockStats,
     pub scene: &'a mut Scene,
     pub renderer: &'a Renderer,
 }
@@ -128,7 +130,12 @@ impl DebugOverlayState {
                         payload.scene.camera.yaw = Camera::DEFAULT_YAW.to_radians();
                         payload.scene.camera.pitch = Camera::DEFAULT_PITCH.to_radians();
                     }
-                })
+                });
+                ui.separator();
+                ui.label(format!(
+                    "FPS: {:.1} ({}ms)",
+                    payload.clock_stats.avg_tps, payload.clock_stats.avg_tick_dur.as_millis(),
+                ));
             })
         });
 

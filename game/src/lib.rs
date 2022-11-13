@@ -1,8 +1,18 @@
-use std::time::Instant;
-
+use common::clock::Clock;
 use tokio::runtime::Runtime;
 use tracing::{debug, debug_span, info};
 use winit::{event::WindowEvent, event_loop::ControlFlow};
+
+pub mod bootstrap;
+pub mod consts;
+#[cfg(feature = "debug_overlay")]
+pub mod egui;
+pub mod error;
+pub mod render;
+pub mod scene;
+pub mod types;
+pub mod utils;
+pub mod window;
 
 #[cfg(feature = "debug_overlay")]
 use crate::egui::DebugOverlay;
@@ -18,16 +28,17 @@ use crate::{
 pub struct Game {
     pub window: Window,
     pub runtime: Runtime,
+    pub clock: Clock,
 
     // Debug UI
     #[cfg(feature = "debug_overlay")]
     pub debug_overlay: DebugOverlay,
-
-    // In-game related
-    last_tick: Instant,
 }
 
 impl Game {
+    pub const TARGET_FPS: u32 = 60;
+    pub const BACKGROUND_FPS: u32 = 30;
+
     pub fn new(window: Window, runtime: Runtime) -> Self {
         // Logging span
         let _span = debug_span!("game_init").entered();
@@ -43,9 +54,9 @@ impl Game {
         Self {
             window,
             runtime,
+            clock: Clock::new(Clock::tps_to_duration(Self::TARGET_FPS)),
             #[cfg(feature = "debug_overlay")]
             debug_overlay,
-            last_tick: Instant::now(),
         }
     }
 
@@ -56,16 +67,7 @@ impl Game {
         let events = self.window.fetch();
 
         // Update game state
-        {
-            // Simple tick counter
-            // FIX: Make better ticking system
-            let tick = Instant::now();
-            let tick_dur = tick - self.last_tick;
-            self.last_tick = tick;
-
-            // Update scene state
-            exit = scene.update(self, events, tick_dur);
-        }
+        exit = scene.update(self, events, self.clock.duration());
 
         if exit {
             *control_flow = ControlFlow::Exit;
@@ -93,7 +95,16 @@ impl Game {
             }
         }
 
-        // TODO: Sleep here
+        // Wait for next frame
+        if !exit {
+            // Lower target frame time when the game window is not focused
+            self.clock.target = Clock::tps_to_duration(if self.window.focused {
+                Self::TARGET_FPS
+            } else {
+                Self::BACKGROUND_FPS
+            });
+            self.clock.tick();
+        }
     }
 
     pub fn run(mut self, event_loop: EventLoop) {

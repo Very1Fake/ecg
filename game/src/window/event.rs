@@ -54,7 +54,10 @@ impl Window {
         match event {
             WindowEvent::Resized(_) => self.resized = true,
             WindowEvent::CloseRequested => self.events.push(Event::Close),
-            WindowEvent::Focused(focused) => self.events.push(Event::Focused(focused)),
+            WindowEvent::Focused(focused) => {
+                self.focused = focused;
+                self.events.push(Event::Focused(focused))
+            }
             WindowEvent::KeyboardInput {
                 input,
                 is_synthetic,

@@ -25,6 +25,7 @@ pub struct Window {
     renderer: Renderer,
 
     pub fullscreen: bool,
+    pub focused: bool,
     cursor_grabbed: bool,
 
     events: Vec<Event>,
@@ -60,6 +61,7 @@ impl Window {
                 renderer,
                 cursor_grabbed: false,
                 fullscreen: false,
+                focused: false,
                 events: Vec::new(),
                 modifiers: Default::default(),
                 resized: false,

@@ -1,24 +1,9 @@
 #![windows_subsystem = "windows"]
 
-pub mod bootstrap;
-pub mod consts;
-#[cfg(feature = "debug_overlay")]
-pub mod egui;
-pub mod error;
-pub mod game;
-pub mod render;
-pub mod scene;
-pub mod types;
-pub mod utils;
-pub mod window;
-
-use error::Error;
 use tokio::runtime::Builder;
 use tracing::{debug, info};
 
-use bootstrap::bootstrap;
-
-use crate::{game::Game, utils::VERSION, window::Window};
+use ecg_game::{bootstrap::bootstrap, error::Error, utils::VERSION, window::Window, Game};
 
 // TODO: Drop anyhow
 fn main() -> Result<(), Error> {
