@@ -3,7 +3,8 @@
 use std::time::Instant;
 
 use egui::{
-    global_dark_light_mode_switch, Context, FontDefinitions, Style, TopBottomPanel, Window,
+    global_dark_light_mode_switch, Context, FontDefinitions, RadioButton, Style, TopBottomPanel,
+    Window,
 };
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use winit::{event::WindowEvent, window::Window as WinitWindow};
@@ -142,27 +143,55 @@ impl DebugOverlayState {
                 ));
             });
 
-        Window::new("Camera Tracker")
+        Window::new("Camera")
             .open(&mut self.camera_tracker_opened)
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
-                ui.label(format!(
-                    "Position: x:{:.3} y:{:.3} z:{:.3}\n\
-                    Yaw: {:.3} ({:.2})\n\
-                    Pitch: {:.3} ({:.2})\n\
-                    FOV: {:.3} {:.2}",
-                    payload.scene.camera.position.x,
-                    payload.scene.camera.position.y,
-                    payload.scene.camera.position.z,
-                    payload.scene.camera.yaw,
-                    payload.scene.camera.yaw.to_degrees(),
-                    payload.scene.camera.pitch,
-                    payload.scene.camera.pitch.to_degrees(),
-                    payload.scene.camera.fov,
-                    payload.scene.camera.fov.to_degrees(),
-                ));
-                ui.label(format!("{:#?}", payload.scene.camera.mode))
+                ui.group(|ui| {
+                    ui.vertical(|ui| {
+                        if ui
+                            .add(RadioButton::new(
+                                matches!(payload.scene.camera.mode, CameraMode::FirstPerson { .. }),
+                                "First Person",
+                            ))
+                            .clicked()
+                        {
+                            payload.scene.camera.mode = CameraMode::first_person();
+                        }
+                        if ui
+                            .add(RadioButton::new(
+                                matches!(payload.scene.camera.mode, CameraMode::ThirdPerson { .. }),
+                                "Third Person",
+                            ))
+                            .clicked()
+                        {
+                            payload.scene.camera.mode = CameraMode::ThirdPerson {
+                                target: payload.scene.camera.position,
+                                distance: CameraMode::DEFAULT_DISTANCE,
+                            };
+                        }
+                    })
+                });
+                ui.collapsing("Tracker", |ui| {
+                    ui.label(format!(
+                        "Position: x:{:.3} y:{:.3} z:{:.3}\n\
+                        Yaw: {:.3} ({:.2})\n\
+                        Pitch: {:.3} ({:.2})\n\
+                        FOV: {:.3} {:.2}\n\
+                        {:#?}",
+                        payload.scene.camera.position.x,
+                        payload.scene.camera.position.y,
+                        payload.scene.camera.position.z,
+                        payload.scene.camera.yaw,
+                        payload.scene.camera.yaw.to_degrees(),
+                        payload.scene.camera.pitch,
+                        payload.scene.camera.pitch.to_degrees(),
+                        payload.scene.camera.fov,
+                        payload.scene.camera.fov.to_degrees(),
+                        payload.scene.camera.mode
+                    ));
+                });
             });
     }
 }

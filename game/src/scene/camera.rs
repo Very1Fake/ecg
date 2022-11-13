@@ -1,11 +1,14 @@
-use std::{f32::consts::FRAC_PI_2, time::Duration};
+use std::{
+    f32::consts::{FRAC_PI_2, FRAC_PI_6, TAU},
+    time::Duration,
+};
 
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::types::{F32x2, F32x3, Matrix4, Rad};
 
 /// Represents camera mode
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum CameraMode {
     FirstPerson {
         /// Direction which camera is facing
@@ -23,10 +26,14 @@ impl CameraMode {
     pub const DEFAULT_FORWARD: F32x3 = F32x3::ONE;
     pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
     pub const DEFAULT_DISTANCE: f32 = 2.5;
-}
 
-impl Default for CameraMode {
-    fn default() -> Self {
+    pub const fn first_person() -> Self {
+        Self::FirstPerson {
+            forward: Self::DEFAULT_FORWARD,
+        }
+    }
+
+    pub const fn third_person() -> Self {
         Self::ThirdPerson {
             target: Self::DEFAULT_TARGET,
             distance: Self::DEFAULT_DISTANCE,
@@ -57,7 +64,7 @@ pub struct Camera {
 }
 
 impl Camera {
-    pub const DEFAULT_POSITION: F32x3 = F32x3::new(0.0, 0.5, 5.0);
+    pub const DEFAULT_POSITION: F32x3 = F32x3::new(5.0, 0.5, 0.0);
     pub const DEFAULT_YAW: f32 = -90.0;
     pub const DEFAULT_PITCH: f32 = 15.0;
     pub const DEFAULT_FOV: f32 = 45.0;
@@ -71,7 +78,7 @@ impl Camera {
             yaw: Self::DEFAULT_YAW.to_radians(),
             pitch: Self::DEFAULT_PITCH.to_radians(),
             aspect,
-            mode: CameraMode::default(),
+            mode: CameraMode::third_person(),
             fov: Self::DEFAULT_FOV.to_radians(),
             near: Self::Z_NEAR,
             far: Self::Z_FAR,
@@ -122,7 +129,6 @@ pub struct CameraController {
 impl CameraController {
     const SPEED: f32 = 2.0;
     const MIN_DISTANCE: f32 = 0.5;
-    const SAFE_PITCH: f32 = FRAC_PI_2 - 0.01;
 
     /// Resets camera controller inputs
     pub fn reset(&mut self) {
@@ -180,16 +186,13 @@ impl CameraController {
         let duration = duration.as_secs_f32();
         let modifier = Self::SPEED * duration;
 
+        // TODO: Use linear interpolation to smooth camera rotation
         // Apply camera rotation
-        camera.yaw += self.horizontal.to_radians() * self.sensitivity * modifier;
-        camera.pitch += self.vertical.to_radians() * self.sensitivity * modifier;
-
+        camera.yaw = (camera.yaw + self.horizontal.to_radians() * self.sensitivity * modifier).rem_euclid(TAU);
         // Pitch angle safety
-        if camera.pitch < -Self::SAFE_PITCH {
-            camera.pitch = -Self::SAFE_PITCH;
-        } else if camera.pitch > Self::SAFE_PITCH {
-            camera.pitch = Self::SAFE_PITCH;
-        }
+        camera.pitch = (camera.pitch + self.vertical.to_radians() * self.sensitivity * modifier)
+            .min(FRAC_PI_2 - 0.001)
+            .max(-FRAC_PI_2 + 0.001);
 
         // Common calculations
         let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
@@ -211,7 +214,8 @@ impl CameraController {
                 camera.position += horizontal_right * (self.left - self.right) * modifier;
 
                 // Change camera FOV
-                camera.fov += self.zoom * 0.5 * modifier;
+                // Also clamp FOV between 30 and 135 degrees
+                camera.fov = (camera.fov + -self.zoom * 0.5 * modifier).clamp(FRAC_PI_6, 2.356194);
             }
             CameraMode::ThirdPerson { target, distance } => {
                 // Zoom in/out
