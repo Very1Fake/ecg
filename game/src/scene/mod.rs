@@ -4,7 +4,6 @@ use wgpu::BufferUsages;
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::{
-    Game,
     render::{
         buffer::{Buffer, DynamicBuffer},
         pipelines::{GlobalModel, Globals, GlobalsBindGroup},
@@ -19,6 +18,7 @@ use crate::{
         event::{Event, Input},
         Window,
     },
+    Game,
 };
 
 use self::{

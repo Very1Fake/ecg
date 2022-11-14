@@ -76,7 +76,7 @@ impl Clock {
         if self.tick_busy_durs.len() >= Self::HISTORY_LENGTH {
             self.tick_busy_durs.pop_front();
         }
-        
+
         // Save current tick total duration to history
         self.tick_durs.push_back(self.last_dur.as_secs_f32());
         // Save current tick busy duration to history
@@ -102,7 +102,7 @@ pub struct ClockStats {
 }
 
 impl ClockStats {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             total: Duration::ZERO,
             avg_tick_dur: Duration::ZERO,

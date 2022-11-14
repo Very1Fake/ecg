@@ -7,3 +7,6 @@ inherits = "release"
 strip = true
 lto = true
 codegen-units = 1
+
+[patch.crates-io]
+wgpu-profiler = { git = "https://github.com/Wumpf/wgpu-profiler", rev = "1bf7d2ce9bc1ca06314faf6e4285651a4d080654" }

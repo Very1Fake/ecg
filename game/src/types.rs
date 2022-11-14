@@ -8,6 +8,8 @@ use glam::{
 pub type EventLoop = winit::event_loop::EventLoop<()>;
 pub type WEvent<'a> = winit::event::Event<'a, ()>;
 
+pub type ProfileResult<'a> = (u8, &'a str, f64);
+
 // Graphics related types
 
 pub type U32x2 = UVec2;

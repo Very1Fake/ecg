@@ -61,13 +61,11 @@ impl Game {
     }
 
     pub fn tick(&mut self, control_flow: &mut ControlFlow, scene: &mut Scene) {
-        let exit;
-
         // Fetch occurred events
         let events = self.window.fetch();
 
         // Update game state
-        exit = scene.update(self, events, self.clock.duration());
+        let exit = scene.update(self, events, self.clock.duration());
 
         if exit {
             *control_flow = ControlFlow::Exit;

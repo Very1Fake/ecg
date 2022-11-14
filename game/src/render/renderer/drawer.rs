@@ -1,10 +1,11 @@
 use std::iter::once;
 
 use wgpu::{
-    Color, CommandEncoder, IndexFormat, LoadOp, Operations, Queue, RenderPass,
+    Color, CommandEncoder, Device, IndexFormat, LoadOp, Operations, Queue, RenderPass,
     RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     SurfaceTexture, TextureView, TextureViewDescriptor,
 };
+use wgpu_profiler::scope::{ManualOwningScope, OwningScope};
 
 use crate::render::buffer::{Buffer, DynamicBuffer};
 use crate::render::pipelines::GlobalsBindGroup;
@@ -20,11 +21,10 @@ use {
     egui::FullOutput,
     egui_wgpu_backend::{BackendError, ScreenDescriptor},
     egui_winit_platform::Platform,
-    wgpu::{Device, SurfaceConfiguration},
+    wgpu::SurfaceConfiguration,
 };
 
 struct RendererBorrow<'frame> {
-    #[cfg(feature = "debug_overlay")]
     device: &'frame Device,
     queue: &'frame Queue,
     pipelines: &'frame Pipelines,
@@ -39,7 +39,7 @@ struct RendererBorrow<'frame> {
 ///
 /// Draw calls will be submitted when the object is dropped.
 pub struct Drawer<'frame> {
-    encoder: Option<CommandEncoder>,
+    encoder: Option<ManualOwningScope<'frame, CommandEncoder>>,
     renderer: RendererBorrow<'frame>,
     output_texture: Option<SurfaceTexture>,
     output_view: TextureView,
@@ -57,10 +57,12 @@ impl<'frame> Drawer<'frame> {
             .texture
             .create_view(&TextureViewDescriptor::default());
 
+        let encoder =
+            ManualOwningScope::start("frame", &mut renderer.profiler, encoder, &renderer.device);
+
         Self {
             encoder: Some(encoder),
             renderer: RendererBorrow {
-                #[cfg(feature = "debug_overlay")]
                 device: &renderer.device,
                 queue: &renderer.queue,
                 pipelines: &renderer.pipelines,
@@ -78,44 +80,45 @@ impl<'frame> Drawer<'frame> {
 
     /// Returns sub drawer for the first pass
     pub fn first_pass(&mut self) -> FirstPassDrawer {
-        let mut render_pass =
-            self.encoder
-                .as_mut()
-                .unwrap()
-                .begin_render_pass(&RenderPassDescriptor {
-                    label: Some("FirstPass"),
-                    // Where to we draw colors
-                    color_attachments: &[Some(RenderPassColorAttachment {
-                        view: &self.output_view,
-                        resolve_target: None,
-                        ops: Operations {
-                            // Where to pick the previous frame.
-                            // Clears screen with specified color
-                            // NOTE: Right now used as simple skybox
-                            load: LoadOp::Clear(Color {
-                                r: 0.458,
-                                g: 0.909,
-                                b: 1.0,
-                                a: 1.0,
-                            }),
-                            // Write results to texture
-                            store: true,
-                        },
-                    })],
-                    depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
-                        view: &self.renderer.depth_texture.view,
-                        depth_ops: Some(Operations {
-                            load: LoadOp::Clear(1.0),
-                            store: true,
+        let mut render_pass = self.encoder.as_mut().unwrap().scoped_render_pass(
+            "first_pass",
+            self.renderer.device,
+            &RenderPassDescriptor {
+                label: Some("FirstPass"),
+                // Where to we draw colors
+                color_attachments: &[Some(RenderPassColorAttachment {
+                    view: &self.output_view,
+                    resolve_target: None,
+                    ops: Operations {
+                        // Where to pick the previous frame.
+                        // Clears screen with specified color
+                        // NOTE: Right now used as simple skybox
+                        load: LoadOp::Clear(Color {
+                            r: 0.458,
+                            g: 0.909,
+                            b: 1.0,
+                            a: 1.0,
                         }),
-                        stencil_ops: None,
+                        // Write results to texture
+                        store: true,
+                    },
+                })],
+                depth_stencil_attachment: Some(RenderPassDepthStencilAttachment {
+                    view: &self.renderer.depth_texture.view,
+                    depth_ops: Some(Operations {
+                        load: LoadOp::Clear(1.0),
+                        store: true,
                     }),
-                });
+                    stencil_ops: None,
+                }),
+            },
+        );
 
         render_pass.set_bind_group(0, &self.globals.inner, &[]);
 
         FirstPassDrawer {
             render_pass,
+            renderer: &self.renderer,
             pipelines: self.renderer.pipelines,
         }
     }
@@ -179,15 +182,18 @@ impl<'frame> Drawer<'frame> {
 
 impl<'frame> Drop for Drawer<'frame> {
     fn drop(&mut self) {
-        // TODO: wgpu profiler. finish frame here
+        let encoder = self.encoder.take().unwrap();
+
+        let (mut encoder, profiler) = encoder.end_scope();
+        profiler.resolve_queries(&mut encoder);
 
         // Submit render operations
-        self.renderer
-            .queue
-            .submit(once(self.encoder.take().unwrap().finish()));
+        self.renderer.queue.submit(once(encoder.finish()));
 
         // Show rendered frame
         self.output_texture.take().unwrap().present();
+
+        profiler.end_frame().expect("GPU Profiler error!");
     }
 }
 
@@ -195,20 +201,20 @@ impl<'frame> Drop for Drawer<'frame> {
 /// Sub drawer that handles first render pass (terrain, figures)
 #[must_use]
 pub struct FirstPassDrawer<'pass> {
-    render_pass: RenderPass<'pass>,
+    render_pass: OwningScope<'pass, RenderPass<'pass>>,
+    renderer: &'pass RendererBorrow<'pass>,
     pipelines: &'pass Pipelines,
 }
 
 impl<'pass> FirstPassDrawer<'pass> {
     /// Draw debug pyramid
     pub fn draw_pyramid(&mut self, vertices: &'pass Buffer<Vertex>, indices: &'pass Buffer<u16>) {
-        self.render_pass.set_pipeline(&self.pipelines.terrain.inner);
-        self.render_pass
-            .set_vertex_buffer(0, vertices.buffer.slice(..));
-        self.render_pass
-            .set_index_buffer(indices.buffer.slice(..), IndexFormat::Uint16);
-        self.render_pass
-            .draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
+        let mut render_pass = self.render_pass.scope("pyramid", self.renderer.device);
+
+        render_pass.set_pipeline(&self.pipelines.terrain.inner);
+        render_pass.set_vertex_buffer(0, vertices.buffer.slice(..));
+        render_pass.set_index_buffer(indices.buffer.slice(..), IndexFormat::Uint16);
+        render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
     }
 
     // FIX: Make `FiguresDrawer` sub drawer for this operation
@@ -217,17 +223,15 @@ impl<'pass> FirstPassDrawer<'pass> {
         model: &'pass T,
         instances: &'pass DynamicBuffer<RawInstance>,
     ) {
+        let mut render_pass = self.render_pass.scope("figure", self.renderer.device);
+
         let (index_buffer, count) = model.get_indices();
 
-        self.render_pass.set_pipeline(&self.pipelines.figure.inner);
-        self.render_pass
-            .set_vertex_buffer(0, model.get_vertices().slice(..));
-        self.render_pass
-            .set_vertex_buffer(1, instances.buffer.slice(..));
-        self.render_pass
-            .set_index_buffer(index_buffer.slice(..), IndexFormat::Uint16);
+        render_pass.set_pipeline(&self.pipelines.figure.inner);
+        render_pass.set_vertex_buffer(0, model.get_vertices().slice(..));
+        render_pass.set_vertex_buffer(1, instances.buffer.slice(..));
+        render_pass.set_index_buffer(index_buffer.slice(..), IndexFormat::Uint16);
         // TODO: Make safe cast
-        self.render_pass
-            .draw_indexed(0..count, 0, 0..instances.length() as u32);
+        render_pass.draw_indexed(0..count, 0, 0..instances.length() as u32);
     }
 }

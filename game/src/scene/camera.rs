@@ -188,7 +188,8 @@ impl CameraController {
 
         // TODO: Use linear interpolation to smooth camera rotation
         // Apply camera rotation
-        camera.yaw = (camera.yaw + self.horizontal.to_radians() * self.sensitivity * modifier).rem_euclid(TAU);
+        camera.yaw = (camera.yaw + self.horizontal.to_radians() * self.sensitivity * modifier)
+            .rem_euclid(TAU);
         // Pitch angle safety
         camera.pitch = (camera.pitch + self.vertical.to_radians() * self.sensitivity * modifier)
             .min(FRAC_PI_2 - 0.001)

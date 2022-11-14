@@ -6,11 +6,12 @@ use wgpu::{
     Limits, PowerPreference, PresentMode, Queue, RequestAdapterOptions, Surface,
     SurfaceConfiguration, SurfaceError, TextureUsages,
 };
+use wgpu_profiler::{GpuProfiler, GpuTimerScopeResult};
 use winit::window::Window;
 
 use crate::{
     render::{renderer::layouts::Layouts, texture::Texture},
-    types::U32x2,
+    types::{ProfileResult, U32x2},
 };
 
 use super::{
@@ -49,6 +50,9 @@ pub struct Renderer {
     layouts: Layouts,
     // TODO: With a large number of pipelines, make (re)creation async
     pipelines: Pipelines,
+
+    profiler: GpuProfiler,
+    profiler_history: Vec<GpuTimerScopeResult>,
 
     // Shaders
     #[cfg(feature = "debug_overlay")]
@@ -112,7 +116,7 @@ impl Renderer {
         let (device, queue) = runtime.block_on(adapter.request_device(
             &DeviceDescriptor {
                 label: Some("GraphicDevice"),
-                features: adapter.features(),
+                features: adapter.features() | GpuProfiler::ALL_WGPU_TIMER_FEATURES,
                 // TODO: Decide wether to support WASM target or not
                 limits: Limits::default(),
             },
@@ -141,7 +145,7 @@ impl Renderer {
             // - RelaxedFifo: Adaptive Sync (AMD on Vulkan)
             // - Mailbox: GSync (DX11/12 or NVIDIA on Vulkan)
             // TODO: Add support for switching modes in game settings
-            present_mode: PresentMode::Fifo,
+            present_mode: PresentMode::Immediate,
             alpha_mode: CompositeAlphaMode::Auto,
         };
         surface.configure(&device, &config);
@@ -155,6 +159,8 @@ impl Renderer {
         #[cfg(feature = "debug_overlay")]
         let egui_render_pass =
             egui_wgpu_backend::RenderPass::new(&device, wgpu::TextureFormat::Bgra8UnormSrgb, 1);
+
+        let profiler = GpuProfiler::new(4, queue.get_timestamp_period(), device.features());
 
         Ok(Self {
             device,
@@ -170,6 +176,9 @@ impl Renderer {
             layouts,
             _shaders: shaders,
             pipelines,
+
+            profiler,
+            profiler_history: Vec::new(),
 
             #[cfg(feature = "debug_overlay")]
             egui_render_pass,
@@ -248,6 +257,11 @@ impl Renderer {
             return Ok(None);
         }
 
+        // Try to save the latest profiling results
+        if let Some(profile_results) = self.profiler.process_finished_frame() {
+            self.profiler_history = profile_results;
+        }
+
         // Used to send series of operations to GPU
         let encoder = self
             .device
@@ -272,5 +286,28 @@ impl Renderer {
         };
 
         Ok(Some(Drawer::new(encoder, self, texture, globals)))
+    }
+
+    pub fn timings(&self) -> Vec<ProfileResult> {
+        let mut vec = Vec::new();
+
+        fn recursive_map<'a>(
+            vec: &mut Vec<ProfileResult<'a>>,
+            scope: &'a GpuTimerScopeResult,
+            level: u8,
+        ) {
+            vec.push((level, &scope.label, scope.time.end - scope.time.start));
+
+            scope
+                .nested_scopes
+                .iter()
+                .for_each(|scope| recursive_map(vec, scope, level + 1));
+        }
+
+        self.profiler_history
+            .iter()
+            .for_each(|scope| recursive_map(&mut vec, scope, 0));
+
+        vec
     }
 }

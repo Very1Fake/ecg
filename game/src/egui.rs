@@ -134,7 +134,8 @@ impl DebugOverlayState {
                 ui.separator();
                 ui.label(format!(
                     "FPS: {:.1} ({}ms)",
-                    payload.clock_stats.avg_tps, payload.clock_stats.avg_tick_dur.as_millis(),
+                    payload.clock_stats.avg_tps,
+                    payload.clock_stats.avg_tick_dur.as_millis(),
                 ));
             })
         });
@@ -146,8 +147,19 @@ impl DebugOverlayState {
             .show(ctx, |ui| {
                 ui.label(format!(
                     "wgpu Backend: {}",
-                    payload.renderer.graphics_backend()
+                    payload.renderer.graphics_backend(),
                 ));
+                ui.collapsing("Timings", |ui| {
+                    payload.renderer.timings().iter().for_each(|timing| {
+                        ui.label(format!(
+                            "{0:1$}{2}: {3:.3}ms",
+                            ' ',
+                            timing.0 as usize + 1,
+                            timing.1,
+                            timing.2 * 1000.0
+                        ));
+                    });
+                });
             });
 
         Window::new("Camera")
@@ -155,6 +167,7 @@ impl DebugOverlayState {
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {
+                // TODO: Add quick camera settings
                 ui.group(|ui| {
                     ui.vertical(|ui| {
                         if ui
