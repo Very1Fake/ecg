@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use common::span;
 use wgpu::BufferUsages;
 use winit::event::{ElementState, VirtualKeyCode};
 
@@ -99,7 +100,9 @@ impl Scene {
     }
 
     /// Update scene state. Return `false` if should close the game
-    pub fn update(&mut self, game: &mut Game, events: Vec<Event>, tick_dur: Duration) -> bool {
+    pub fn tick(&mut self, game: &mut Game, events: Vec<Event>, tick_dur: Duration) -> bool {
+        span!(_guard, "tick", "Scene::tick");
+
         let mut exit = false;
 
         // Handle events
@@ -162,6 +165,8 @@ impl Scene {
 
     /// Draw in-game objects
     pub fn draw<'a>(&'a self, mut drawer: FirstPassDrawer<'a>) {
+        span!(_guard, "draw", "Scene::draw");
+
         // Draw "terrain"
         drawer.draw_pyramid(&self.pyramid_vertices, &self.pyramid_indices);
 

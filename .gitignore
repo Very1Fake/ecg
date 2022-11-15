@@ -17,6 +17,8 @@ Cargo.lock
 
 # IDEs
 
-## Fleet
+## VS Code
+.vscode/
 
+## Fleet
 .fleet/

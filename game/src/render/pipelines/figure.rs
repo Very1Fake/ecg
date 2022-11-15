@@ -1,3 +1,4 @@
+use common::span;
 use wgpu::{
     BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType, ColorTargetState,
     ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,
@@ -35,6 +36,8 @@ impl FigurePipeline {
         shader: &ShaderModule,
         globals_layout: &GlobalLayout,
     ) -> Self {
+        span!(_guard, "FigurePipeline::new");
+
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("PipelineLayout: Figure"),
             bind_group_layouts: &[&globals_layout.globals],

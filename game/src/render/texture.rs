@@ -1,4 +1,5 @@
-use tracing::{debug, debug_span};
+use common::span;
+use tracing::debug;
 use wgpu::{
     AddressMode, CompareFunction, Device, Extent3d, FilterMode, Sampler, SamplerDescriptor,
     SurfaceConfiguration, Texture as WTexture, TextureDescriptor, TextureDimension, TextureFormat,
@@ -18,7 +19,7 @@ impl Texture {
     pub const DEPTH_FORMAT: TextureFormat = TextureFormat::Depth32Float;
 
     pub fn new_depth(device: &Device, config: &SurfaceConfiguration, label: &str) -> Self {
-        let _span = debug_span!("new_depth_texture");
+        span!(_guard, "NewDepthTexture");
 
         let size = Extent3d {
             width: config.width,

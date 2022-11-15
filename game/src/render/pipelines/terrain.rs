@@ -1,3 +1,4 @@
+use common::span;
 use wgpu::{
     BlendState, ColorTargetState, ColorWrites, CompareFunction, DepthBiasState, DepthStencilState,
     Device, Face, FragmentState, FrontFace, MultisampleState, PipelineLayoutDescriptor,
@@ -20,6 +21,8 @@ impl TerrainPipeline {
         shader: &ShaderModule,
         globals_layout: &GlobalLayout,
     ) -> Self {
+        span!(_guard, "TerrainPipeline::new");
+
         let layout = device.create_pipeline_layout(&PipelineLayoutDescriptor {
             label: Some("PipelineLayout: Terrain"),
             bind_group_layouts: &[&globals_layout.globals],

@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use common::prof;
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor};
 
 // TODO: Make dynamic shader loading (at runtime)
@@ -8,6 +9,7 @@ pub trait Shader {
     const DESCRIPTOR: ShaderModuleDescriptor<'static>;
 
     fn init(device: &Device) -> ShaderModule {
+        prof!(_guard, "Shader::new");
         device.create_shader_module(Self::DESCRIPTOR)
     }
 }

@@ -5,6 +5,8 @@ use std::{
 
 use spin_sleep::sleep;
 
+use crate::span;
+
 /// Clock tries to keep tick a constant time
 pub struct Clock {
     /// Target tick duration
@@ -51,6 +53,8 @@ impl Clock {
     }
 
     pub fn tick(&mut self) {
+        span!(_guard, "tick", "Clock::tick");
+
         // Current system time
         let now = Instant::now();
         // Duration between last end time and current tick start time.

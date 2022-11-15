@@ -1,4 +1,5 @@
 use bytemuck::Pod;
+use common::span;
 use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 use wgpu::{
@@ -253,6 +254,8 @@ impl Renderer {
         &'a mut self,
         globals: &'a GlobalsBindGroup,
     ) -> Result<Option<Drawer<'a>>, RenderError> {
+        span!(_guard, "start_frame", "Renderer::start_frame");
+
         if self.is_minimized {
             return Ok(None);
         }

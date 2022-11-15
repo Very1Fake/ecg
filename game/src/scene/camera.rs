@@ -3,6 +3,7 @@ use std::{
     time::Duration,
 };
 
+use common::prof;
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::types::{F32x2, F32x3, Matrix4, Rad};
@@ -183,6 +184,8 @@ impl CameraController {
     }
 
     pub fn update_camera(&mut self, camera: &mut Camera, duration: Duration) {
+        prof!(_guard, "Camera::update_camera");
+
         let duration = duration.as_secs_f32();
         let modifier = Self::SPEED * duration;
 

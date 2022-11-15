@@ -1,6 +1,6 @@
-use common::clock::Clock;
+use common::{clock::Clock, prof, span};
 use tokio::runtime::Runtime;
-use tracing::{debug, debug_span, info};
+use tracing::{debug, info};
 use winit::{event::WindowEvent, event_loop::ControlFlow};
 
 pub mod bootstrap;
@@ -41,7 +41,7 @@ impl Game {
 
     pub fn new(window: Window, runtime: Runtime) -> Self {
         // Logging span
-        let _span = debug_span!("game_init").entered();
+        span!(_guard, "GameInit");
 
         info!("Creating new game instance");
 
@@ -61,11 +61,16 @@ impl Game {
     }
 
     pub fn tick(&mut self, control_flow: &mut ControlFlow, scene: &mut Scene) {
+        span!(_guard, "MainEventsCleared");
+        let exit;
         // Fetch occurred events
-        let events = self.window.fetch();
+        let events = self.window.fetch_events();
 
         // Update game state
-        let exit = scene.update(self, events, self.clock.duration());
+        {
+            span!(_guard, "StateTick");
+            exit = scene.tick(self, events, self.clock.duration());
+        }
 
         if exit {
             *control_flow = ControlFlow::Exit;
@@ -73,6 +78,8 @@ impl Game {
 
         // Render
         {
+            span!(_guard, "Render");
+
             #[cfg(feature = "debug_overlay")]
             let scale_factor = self.window.inner().scale_factor() as f32;
 
@@ -82,7 +89,9 @@ impl Game {
                 .start_frame(&scene.globals_bind_group)
                 .expect("Unrecoverable render error when starting a new frame")
             {
+                prof!(guard, "Render::FirstPass");
                 scene.draw(drawer.first_pass());
+                drop(guard);
 
                 #[cfg(feature = "debug_overlay")]
                 if scene.show_overlay {
@@ -95,13 +104,20 @@ impl Game {
 
         // Wait for next frame
         if !exit {
+            span!(_guard, "Sleep");
             // Lower target frame time when the game window is not focused
             self.clock.target = Clock::tps_to_duration(if self.window.focused {
                 Self::TARGET_FPS
             } else {
                 Self::BACKGROUND_FPS
             });
+
+            // Sleep remaining time
             self.clock.tick();
+
+            // Finish tracy frame
+            #[cfg(feature = "tracy")]
+            common::tracy_client::frame_mark();
         }
     }
 
@@ -109,6 +125,9 @@ impl Game {
         // TODO: PlayStates
         debug!("Initializing game scene");
         let mut scene = Scene::new(&mut self.window);
+
+        let mut poll_span = None;
+        let mut event_span = None;
 
         debug!("Entering game loop");
         event_loop.run(move |event, _, control_flow| {
@@ -129,6 +148,10 @@ impl Game {
 
             // Event checking
             match event {
+                WEvent::NewEvents(_) => {
+                    prof!(span, "HandleEvents");
+                    event_span = Some(span);
+                }
                 // Check for app close event
                 WEvent::WindowEvent {
                     event: WindowEvent::CloseRequested,
@@ -137,9 +160,23 @@ impl Game {
                     info!("Closing game!");
                     control_flow.set_exit_with_code(ExitCode::Ok.as_int());
                 }
-                WEvent::WindowEvent { event, .. } => self.window.handle_window_event(event),
-                WEvent::DeviceEvent { event, .. } => self.window.handle_device_event(event),
-                WEvent::MainEventsCleared => self.tick(control_flow, &mut scene),
+                WEvent::WindowEvent { event, .. } => {
+                    span!(_guard, "WindowEvent");
+                    self.window.handle_window_event(event)
+                }
+                WEvent::DeviceEvent { event, .. } => {
+                    span!(_guard, "DeviceEvent");
+                    self.window.handle_device_event(event)
+                }
+                WEvent::MainEventsCleared => {
+                    event_span.take();
+                    poll_span.take();
+
+                    self.tick(control_flow, &mut scene);
+
+                    prof!(span, "PollWinit");
+                    poll_span = Some(span);
+                }
                 _ => {}
             }
         });

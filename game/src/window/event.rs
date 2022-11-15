@@ -1,5 +1,6 @@
 use std::mem::replace;
 
+use common::span;
 use tracing::debug;
 use winit::{
     dpi::PhysicalSize,
@@ -108,7 +109,9 @@ impl Window {
         }
     }
 
-    pub fn fetch(&mut self) -> Vec<Event> {
+    pub fn fetch_events(&mut self) -> Vec<Event> {
+        span!(_guard, "fetch_events", "Window::fetch_event");
+
         // Handle deduplicated resize event
         if self.resized {
             self.resized = false;
