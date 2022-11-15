@@ -5,7 +5,11 @@ use tracing::{debug, info};
 
 use ecg_game::{bootstrap::bootstrap, error::Error, utils::VERSION, window::Window, Game};
 
-// TODO: Drop anyhow
+#[cfg_attr(feature = "tracy-memory", global_allocator)]
+#[cfg(feature = "tracy-memory")]
+static GLOBAL: common::tracy_client::ProfiledAllocator<std::alloc::System> =
+    common::tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
+
 fn main() -> Result<(), Error> {
     bootstrap()?;
 
