@@ -65,6 +65,15 @@ pub struct Camera {
 }
 
 impl Camera {
+    // Limits
+    pub const MIN_FOV: f32 = FRAC_PI_6;
+    pub const MAX_FOV: f32 = 2.356194;
+    pub const MIN_Z_NEAR: f32 = 0.01; // FIX
+    pub const MAX_Z_NEAR: f32 = 16.0;
+    pub const MIN_Z_FAR: f32 = 32.0;
+    pub const MAX_Z_FAR: f32 = 512.0; // FIX
+
+    // Defaults
     pub const DEFAULT_POSITION: F32x3 = F32x3::new(5.0, 0.5, 0.0);
     pub const DEFAULT_YAW: f32 = -90.0;
     pub const DEFAULT_PITCH: f32 = 15.0;
@@ -219,7 +228,8 @@ impl CameraController {
 
                 // Change camera FOV
                 // Also clamp FOV between 30 and 135 degrees
-                camera.fov = (camera.fov + -self.zoom * 0.5 * modifier).clamp(FRAC_PI_6, 2.356194);
+                camera.fov = (camera.fov + -self.zoom * 0.5 * modifier)
+                    .clamp(Camera::MIN_FOV, Camera::MAX_FOV);
             }
             CameraMode::ThirdPerson { target, distance } => {
                 // Zoom in/out

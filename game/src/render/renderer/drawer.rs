@@ -126,7 +126,7 @@ impl<'frame> Drawer<'frame> {
     // FIX: Handle egui textures better
     /// Draw debug overlay
     #[cfg(feature = "debug_overlay")]
-    pub fn draw_debug_overlay(
+    pub fn draw_overlay(
         &mut self,
         platform: &mut Platform,
         scale_factor: f32,

@@ -58,6 +58,7 @@ pub struct Scene {
 impl Scene {
     /// Create new `Scene`
     pub fn new(window: &mut Window) -> Self {
+        span!(_guard, "new", "Scene::new");
         window.grab_cursor(true);
         let renderer = window.renderer_mut();
 
@@ -99,6 +100,7 @@ impl Scene {
         self.camera_controller.reset();
     }
 
+    // FIX: Make `Settings` to pass overlay toggles
     /// Update scene state. Return `false` if should close the game
     pub fn tick(&mut self, game: &mut Game, events: Vec<Event>, tick_dur: Duration) -> bool {
         span!(_guard, "tick", "Scene::tick");
@@ -112,11 +114,17 @@ impl Scene {
             // FIX: Abnormal touchpad sensitivity
             Event::MouseMove(delta, true) => self.camera_controller.mouse_move(delta),
             Event::Zoom(delta, true) => self.camera_controller.mouse_wheel(delta),
-            Event::Input(Input::Key(key), state) => {
+            Event::Input(Input::Key(key), state, modifiers) => {
                 match key {
                     VirtualKeyCode::Escape => exit = true,
                     VirtualKeyCode::P if matches!(state, ElementState::Released) => {
                         self.toggle_cursor_grub()
+                    }
+                    #[cfg(feature = "debug_overlay")]
+                    VirtualKeyCode::F3
+                        if matches!(state, ElementState::Released) && modifiers.shift() =>
+                    {
+                        game.overlay.toggle_top_bar();
                     }
                     #[cfg(feature = "debug_overlay")]
                     VirtualKeyCode::F3 if matches!(state, ElementState::Released) => {
@@ -135,7 +143,7 @@ impl Scene {
 
         // Update debug overlay
         #[cfg(feature = "debug_overlay")]
-        game.debug_overlay.update(crate::egui::DebugPayload {
+        game.overlay.update(crate::egui::DebugPayload {
             clock_stats: game.clock.stats(),
             scene: self,
             renderer: game.window.renderer(),

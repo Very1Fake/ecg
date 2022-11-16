@@ -32,7 +32,7 @@ pub struct Game {
 
     // Debug UI
     #[cfg(feature = "debug_overlay")]
-    pub debug_overlay: DebugOverlay,
+    pub overlay: DebugOverlay,
 }
 
 impl Game {
@@ -46,7 +46,7 @@ impl Game {
         info!("Creating new game instance");
 
         #[cfg(feature = "debug_overlay")]
-        let debug_overlay = {
+        let overlay = {
             info!("Initializing debug UI");
             DebugOverlay::new(window.inner())
         };
@@ -56,7 +56,7 @@ impl Game {
             runtime,
             clock: Clock::new(Clock::tps_to_duration(Self::TARGET_FPS)),
             #[cfg(feature = "debug_overlay")]
-            debug_overlay,
+            overlay,
         }
     }
 
@@ -96,7 +96,7 @@ impl Game {
                 #[cfg(feature = "debug_overlay")]
                 if scene.show_overlay {
                     drawer
-                        .draw_debug_overlay(&mut self.debug_overlay.platform, scale_factor)
+                        .draw_overlay(&mut self.overlay.platform, scale_factor)
                         .expect("Unrecoverable render error when drawing debug overlay");
                 }
             }
@@ -123,7 +123,6 @@ impl Game {
 
     pub fn run(mut self, event_loop: EventLoop) {
         // TODO: PlayStates
-        debug!("Initializing game scene");
         let mut scene = Scene::new(&mut self.window);
 
         let mut poll_span = None;
@@ -139,7 +138,7 @@ impl Game {
                 // Let debug UI handle occurred event, if cursor detached from camera
                 if scene.show_overlay
                     && self
-                        .debug_overlay
+                        .overlay
                         .handle_event(&event, self.window.cursor_grabbed())
                 {
                     return;

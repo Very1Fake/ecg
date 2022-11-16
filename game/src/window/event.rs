@@ -5,8 +5,8 @@ use tracing::debug;
 use winit::{
     dpi::PhysicalSize,
     event::{
-        DeviceEvent, ElementState, MouseButton, MouseScrollDelta, ScanCode, VirtualKeyCode,
-        WindowEvent,
+        DeviceEvent, ElementState, ModifiersState, MouseButton, MouseScrollDelta, ScanCode,
+        VirtualKeyCode, WindowEvent,
     },
     window::Fullscreen,
 };
@@ -39,9 +39,9 @@ pub enum Event {
     // MouseButton(MouseButton, ElementState),
     /// A mouse wheel has been scrolled
     Zoom(f32, bool),
-    // TODO: Add GameInput and keybinding
+    // TODO: Add GameInput and keybindings
     /// A keyboard button has been pressed/released
-    Input(Input, ElementState),
+    Input(Input, ElementState, ModifiersState),
     /// The window is (un)focused
     Focused(bool),
 }
@@ -78,6 +78,7 @@ impl Window {
                             None => Input::ScanCode(input.scancode),
                         },
                         input.state,
+                        self.modifiers,
                     )),
                 };
             }
@@ -92,7 +93,8 @@ impl Window {
                 self.cursor_grabbed,
             )),
             WindowEvent::MouseInput { state, button, .. } => {
-                self.events.push(Event::Input(Input::Mouse(button), state))
+                self.events
+                    .push(Event::Input(Input::Mouse(button), state, self.modifiers))
             }
             // TODO: Throw event when UI is implemented
             WindowEvent::ScaleFactorChanged { .. } => self.resized = true,
