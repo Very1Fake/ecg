@@ -4,14 +4,15 @@ use std::time::Instant;
 
 use common::clock::ClockStats;
 use egui::{
-    global_dark_light_mode_switch, Context, FontDefinitions, Grid, RadioButton, Slider, Style,
-    TopBottomPanel, Window,
+    global_dark_light_mode_switch, ComboBox, Context, FontDefinitions, Grid, RadioButton, Slider,
+    Style, TopBottomPanel, Window,
 };
 use egui_winit_platform::{Platform, PlatformDescriptor};
+use wgpu::PresentMode;
 use winit::{event::WindowEvent, window::Window as WinitWindow};
 
 use crate::{
-    render::renderer::Renderer,
+    render::{renderer::Renderer, RenderMode},
     scene::{
         camera::{Camera, CameraMode},
         Scene,
@@ -93,25 +94,33 @@ impl DebugOverlay {
 pub struct DebugPayload<'a> {
     pub clock_stats: ClockStats,
     pub scene: &'a mut Scene,
-    pub renderer: &'a Renderer,
+    pub renderer: &'a mut Renderer,
 }
 
 /// Represents debug overlay state (windows, buttons, etc.)
 pub struct DebugOverlayState {
+    // UI Visibility
     /// Overlay top bar
-    pub top_bar_visible: bool,
-    /// gpu timings
-    wgpu_profiler_opened: bool,
-    /// Camera tracker window
-    camera_tracker_opened: bool,
+    top_bar_visible: bool,
+    /// Graphics tweaks window
+    graphics_opened: bool,
+    /// GPU timings
+    gpu_timing_opened: bool,
+    /// Camera tweaks window
+    camera_opened: bool,
+
+    // SubStates
+    graphics_tweaks: GraphicsTweaks,
 }
 
 impl DebugOverlayState {
     pub const fn new() -> Self {
         Self {
             top_bar_visible: true,
-            wgpu_profiler_opened: false,
-            camera_tracker_opened: false,
+            graphics_opened: false,
+            gpu_timing_opened: false,
+            camera_opened: false,
+            graphics_tweaks: GraphicsTweaks::new(),
         }
     }
 
@@ -119,7 +128,7 @@ impl DebugOverlayState {
     pub fn draw(&mut self, ctx: &Context, payload: DebugPayload) {
         let DebugPayload {
             clock_stats,
-            scene: Scene { camera, .. },
+            scene: Scene { camera, fps, .. },
             renderer,
         } = payload;
 
@@ -129,13 +138,16 @@ impl DebugOverlayState {
                     global_dark_light_mode_switch(ui);
                     ui.separator();
                     ui.menu_button("Game", |menu| {
-                        if menu.button("wgpu Profiler").clicked() {
-                            self.wgpu_profiler_opened = true;
+                        if menu.button("GPU Timings").clicked() {
+                            self.gpu_timing_opened = true;
+                        }
+                        if menu.button("Graphics").clicked() {
+                            self.graphics_opened = true;
                         }
                     });
                     ui.menu_button("Scene", |menu| {
                         if menu.button("Camera").clicked() {
-                            self.camera_tracker_opened = true;
+                            self.camera_opened = true;
                         }
                         if menu.button("Reset").clicked() {
                             match &mut camera.mode {
@@ -161,9 +173,8 @@ impl DebugOverlayState {
             });
         }
 
-        Window::new("wgpu Profiler")
-            .open(&mut self.wgpu_profiler_opened)
-            .collapsible(false)
+        Window::new("GPU Timings")
+            .open(&mut self.gpu_timing_opened)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.label(format!("wgpu Backend: {}", renderer.graphics_backend(),));
@@ -180,9 +191,60 @@ impl DebugOverlayState {
                 });
             });
 
+        Window::new("Graphics")
+            .open(&mut self.graphics_opened)
+            .resizable(false)
+            .show(ctx, |ui| {
+                Grid::new("camera_tweaks")
+                    .num_columns(2)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("Present Mode");
+                        ComboBox::from_id_source("present_mode")
+                            .selected_text(format!("{:?}", self.graphics_tweaks.present_mode))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.graphics_tweaks.present_mode,
+                                    PresentMode::Fifo,
+                                    "Fifo",
+                                );
+                                ui.selectable_value(
+                                    &mut self.graphics_tweaks.present_mode,
+                                    PresentMode::Mailbox,
+                                    "Mailbox",
+                                );
+                                ui.selectable_value(
+                                    &mut self.graphics_tweaks.present_mode,
+                                    PresentMode::Immediate,
+                                    "Immediate",
+                                );
+                            });
+                        ui.end_row();
+
+                        ui.label("FPS Cap");
+                        ui.add(
+                            Slider::new(
+                                &mut self.graphics_tweaks.fps,
+                                Scene::FPS_MIN..=Scene::FPS_MAX,
+                            )
+                            .integer(),
+                        );
+                        ui.end_row();
+                    });
+
+                ui.horizontal(|ui| {
+                    if ui.button("Reset").clicked() {
+                        self.graphics_tweaks = GraphicsTweaks::new();
+                    }
+                    if ui.button("Apply").clicked() {
+                        renderer.set_render_mode(self.graphics_tweaks.as_render_mode());
+                        *fps = self.graphics_tweaks.fps;
+                    }
+                });
+            });
+
         Window::new("Camera")
-            .open(&mut self.camera_tracker_opened)
-            .collapsible(false)
+            .open(&mut self.camera_opened)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.collapsing("Tweaks", |ui| {
@@ -225,6 +287,16 @@ impl DebugOverlayState {
                             );
                             ui.end_row();
 
+                            ui.label("Z Near");
+                            ui.add(
+                                Slider::new(
+                                    &mut camera.near,
+                                    Camera::MIN_Z_NEAR..=Camera::MAX_Z_NEAR,
+                                )
+                                .max_decimals(3),
+                            );
+                            ui.end_row();
+
                             ui.label("Z Far");
                             ui.add(
                                 Slider::new(&mut camera.far, Camera::MIN_Z_FAR..=Camera::MAX_Z_FAR)
@@ -253,5 +325,25 @@ impl DebugOverlayState {
                     ));
                 });
             });
+    }
+}
+
+pub struct GraphicsTweaks {
+    fps: u32,
+    present_mode: PresentMode,
+}
+
+impl GraphicsTweaks {
+    pub const fn new() -> Self {
+        Self {
+            fps: Scene::FPS_DEFAULT,
+            present_mode: RenderMode::new().present_mode,
+        }
+    }
+
+    pub fn as_render_mode(&self) -> RenderMode {
+        RenderMode {
+            present_mode: self.present_mode,
+        }
     }
 }

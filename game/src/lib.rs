@@ -36,7 +36,6 @@ pub struct Game {
 }
 
 impl Game {
-    pub const TARGET_FPS: u32 = 60;
     pub const BACKGROUND_FPS: u32 = 30;
 
     pub fn new(window: Window, runtime: Runtime) -> Self {
@@ -54,7 +53,7 @@ impl Game {
         Self {
             window,
             runtime,
-            clock: Clock::new(Clock::tps_to_duration(Self::TARGET_FPS)),
+            clock: Clock::new(Clock::tps_to_duration(Self::BACKGROUND_FPS)),
             #[cfg(feature = "debug_overlay")]
             overlay,
         }
@@ -105,11 +104,13 @@ impl Game {
         // Wait for next frame
         if !exit {
             span!(_guard, "Sleep");
+            let max_fps = scene.fps;
+
             // Lower target frame time when the game window is not focused
             self.clock.target = Clock::tps_to_duration(if self.window.focused {
-                Self::TARGET_FPS
+                max_fps
             } else {
-                Self::BACKGROUND_FPS
+                max_fps.min(Self::BACKGROUND_FPS)
             });
 
             // Sleep remaining time

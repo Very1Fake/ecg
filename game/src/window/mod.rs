@@ -8,7 +8,7 @@ use winit::{
 
 use crate::{
     consts::{MIN_WINDOW_HEIGHT, MIN_WINDOW_WIDTH},
-    render::{error::RenderError, renderer::Renderer},
+    render::{error::RenderError, renderer::Renderer, RenderMode},
     types::EventLoop,
     utils::VERSION,
 };
@@ -53,7 +53,8 @@ impl Window {
             .build(&event_loop)
             .unwrap();
 
-        let renderer = Renderer::new(&window, runtime)?;
+        // TODO: Load `RenderMode` from settings
+        let renderer = Renderer::new(&window, RenderMode::new(), runtime)?;
 
         Ok((
             Self {

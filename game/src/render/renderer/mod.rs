@@ -4,8 +4,8 @@ use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 use wgpu::{
     Backends, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Instance,
-    Limits, PowerPreference, PresentMode, Queue, RequestAdapterOptions, Surface,
-    SurfaceConfiguration, SurfaceError, TextureUsages,
+    Limits, PowerPreference, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    SurfaceError, TextureUsages,
 };
 use wgpu_profiler::{GpuProfiler, GpuTimerScopeResult};
 use winit::window::Window;
@@ -20,6 +20,7 @@ use super::{
     error::RenderError,
     pipelines::GlobalsBindGroup,
     shader::ShaderModules,
+    RenderMode,
 };
 
 use {drawer::Drawer, pipelines::Pipelines};
@@ -41,6 +42,7 @@ pub struct Renderer {
     pub config: SurfaceConfiguration,
 
     // Inner state
+    render_mode: RenderMode,
     resolution: U32x2,
     is_minimized: bool,
 
@@ -64,7 +66,11 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(window: &Window, runtime: &Runtime) -> Result<Self, RenderError> {
+    pub fn new(
+        window: &Window,
+        render_mode: RenderMode,
+        runtime: &Runtime,
+    ) -> Result<Self, RenderError> {
         let size = window.inner_size();
         // TODO: Parse backend from env
         let backend = Backends::PRIMARY;
@@ -146,7 +152,7 @@ impl Renderer {
             // - RelaxedFifo: Adaptive Sync (AMD on Vulkan)
             // - Mailbox: GSync (DX11/12 or NVIDIA on Vulkan)
             // TODO: Add support for switching modes in game settings
-            present_mode: PresentMode::Immediate,
+            present_mode: render_mode.present_mode,
             alpha_mode: CompositeAlphaMode::Auto,
         };
         surface.configure(&device, &config);
@@ -169,6 +175,7 @@ impl Renderer {
             surface,
             config,
 
+            render_mode,
             resolution: U32x2::new(size.width, size.height),
             is_minimized: false,
 
@@ -244,6 +251,17 @@ impl Renderer {
             self.depth_texture = Texture::new_depth(&self.device, &self.config, "Depth Texture");
         } else {
             self.is_minimized = true;
+        }
+    }
+
+    /// Change `Renderer` configuration
+    pub fn set_render_mode(&mut self, render_mode: RenderMode) {
+        if self.render_mode != render_mode {
+            self.render_mode = render_mode;
+
+            self.config.present_mode = self.render_mode.present_mode;
+
+            self.on_resize(self.resolution);
         }
     }
 

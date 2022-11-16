@@ -48,6 +48,9 @@ pub struct Scene {
     pub voxel_instance: Instance,
     pub voxel_instance_buffer: DynamicBuffer<RawInstance>,
 
+    // TODO: Store in settings
+    pub fps: u32,
+
     // UI
     force_cursor_grub: bool,
 
@@ -56,6 +59,10 @@ pub struct Scene {
 }
 
 impl Scene {
+    pub const FPS_MIN: u32 = 10;
+    pub const FPS_DEFAULT: u32 = 60;
+    pub const FPS_MAX: u32 = 360;
+
     /// Create new `Scene`
     pub fn new(window: &mut Window) -> Self {
         span!(_guard, "new", "Scene::new");
@@ -87,6 +94,8 @@ impl Scene {
             voxel: Voxel::new(&renderer.device),
             voxel_instance,
             voxel_instance_buffer,
+
+            fps: Scene::FPS_DEFAULT,
 
             force_cursor_grub: true,
 
@@ -146,7 +155,7 @@ impl Scene {
         game.overlay.update(crate::egui::DebugPayload {
             clock_stats: game.clock.stats(),
             scene: self,
-            renderer: game.window.renderer(),
+            renderer: game.window.renderer_mut(),
         });
 
         // Update camera
