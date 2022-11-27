@@ -18,7 +18,7 @@ debug_overlay = ["egui", "egui_winit_platform", "egui_wgpu_backend"]
 bytemuck = { version = "1.12", features = ["derive"] }
 glam = { version = "0.22", features = ["bytemuck"] }
 thiserror = "1.0"
-tokio = { version = "1.0", features = ["rt-multi-thread"] }
+tokio = { version = "1.22", features = ["rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 wgpu = "0.14"
