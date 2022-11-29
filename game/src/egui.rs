@@ -154,13 +154,12 @@ impl DebugOverlayState {
                                 CameraMode::FirstPerson { forward } => {
                                     *forward = CameraMode::DEFAULT_FORWARD
                                 }
-                                CameraMode::ThirdPerson { target, distance } => {
+                                CameraMode::ThirdPerson { target } => {
                                     *target = CameraMode::DEFAULT_TARGET;
-                                    *distance = CameraMode::DEFAULT_DISTANCE;
                                 }
                             }
-                            camera.yaw = Camera::DEFAULT_YAW.to_radians();
-                            camera.pitch = Camera::DEFAULT_PITCH.to_radians();
+                            camera.f_rot = Camera::DEFAULT_ORIENTATION;
+                            camera.set_mode(CameraMode::third_person());
                         }
                     });
                     ui.separator();
@@ -270,17 +269,20 @@ impl DebugOverlayState {
                                     ))
                                     .clicked()
                                 {
-                                    camera.mode = CameraMode::ThirdPerson {
-                                        target: camera.position,
-                                        distance: CameraMode::DEFAULT_DISTANCE,
-                                    };
+                                    camera.mode = CameraMode::ThirdPerson { target: camera.pos };
                                 }
                             });
                             ui.end_row();
 
+                            ui.checkbox(&mut camera.smooth_position, "Smooth position");
+                            ui.end_row();
+
+                            ui.checkbox(&mut camera.smooth_rotation, "Smooth rotation");
+                            ui.end_row();
+
                             ui.label("FOV");
                             ui.add(
-                                Slider::new(&mut camera.fov, Camera::MIN_FOV..=Camera::MAX_FOV)
+                                Slider::new(&mut camera.f_fov, Camera::MIN_FOV..=Camera::MAX_FOV)
                                     .custom_formatter(|fov, _| {
                                         format!("{:.1}° ({:.2})", fov.to_degrees(), fov)
                                     }),
@@ -310,18 +312,39 @@ impl DebugOverlayState {
                         "Position: x:{:.3} y:{:.3} z:{:.3}\n\
                         Yaw: {:.3} ({:.2})\n\
                         Pitch: {:.3} ({:.2})\n\
+                        Distance: {:.2}\n\
                         FOV: {:.3} {:.2}\n\
                         {:#?}",
-                        camera.position.x,
-                        camera.position.y,
-                        camera.position.z,
-                        camera.yaw,
-                        camera.yaw.to_degrees(),
-                        camera.pitch,
-                        camera.pitch.to_degrees(),
+                        camera.pos.x,
+                        camera.pos.y,
+                        camera.pos.z,
+                        camera.rot.x,
+                        camera.rot.x.to_degrees(),
+                        camera.rot.y,
+                        camera.rot.y.to_degrees(),
+                        camera.dist,
                         camera.fov,
                         camera.fov.to_degrees(),
                         camera.mode
+                    ));
+                });
+                ui.collapsing("Future Tracker", |ui| {
+                    ui.label(format!(
+                        "Position: x:{:.3} y:{:.3} z:{:.3}\n\
+                        Yaw: {:.3} ({:.2})\n\
+                        Pitch: {:.3} ({:.2})\n\
+                        Distance: {:.2}\n\
+                        FOV: {:.3} {:.2}\n",
+                        camera.f_pos.x,
+                        camera.f_pos.y,
+                        camera.f_pos.z,
+                        camera.f_rot.x,
+                        camera.f_rot.x.to_degrees(),
+                        camera.f_rot.y,
+                        camera.f_rot.y.to_degrees(),
+                        camera.f_dist,
+                        camera.f_fov,
+                        camera.f_fov.to_degrees(),
                     ));
                 });
             });

@@ -121,8 +121,8 @@ impl Scene {
             Event::Close => exit = true,
             Event::Resize(size) => self.camera.aspect = size.x as f32 / size.y as f32,
             // FIX: Abnormal touchpad sensitivity
-            Event::MouseMove(delta, true) => self.camera_controller.mouse_move(delta),
-            Event::Zoom(delta, true) => self.camera_controller.mouse_wheel(delta),
+            Event::MouseMove(delta, true) => self.camera.rotate(delta),
+            Event::Zoom(delta, true) => self.camera.zoom(delta),
             Event::Input(Input::Key(key), state, modifiers) => {
                 match key {
                     VirtualKeyCode::Escape => exit = true,
@@ -160,7 +160,8 @@ impl Scene {
 
         // Update camera
         self.camera_controller
-            .update_camera(&mut self.camera, tick_dur);
+            .move_camera(&mut self.camera, tick_dur);
+        self.camera.update(tick_dur);
         game.window.renderer().update_consts(
             &self.model.globals,
             &[Globals::new(self.camera.proj_mat(), self.camera.view_mat())],

@@ -15,8 +15,6 @@ use crate::types::{F32x2, U32x2};
 
 use super::Window;
 
-const DIFFERENCE_FROM_DEVICE_EVENT_ON_X11: f32 = 15.0;
-
 /// Represents input from keyboard and mouse
 #[derive(Clone, Copy, Debug)]
 pub enum Input {
@@ -48,6 +46,8 @@ pub enum Event {
 
 /// Window logic for processing incoming events
 impl Window {
+    // TODO: Don't hardcode this
+    const MOTION_SENSITIVITY: f32 = 2.5;
     const EVENTS_PREALLOCATE: usize = 4;
 
     pub fn handle_window_event(&mut self, event: WindowEvent) {
@@ -85,10 +85,10 @@ impl Window {
             WindowEvent::ModifiersChanged(modifiers) => self.modifiers = modifiers,
             WindowEvent::MouseWheel { delta, .. } => self.events.push(Event::Zoom(
                 {
-                    (match delta {
+                    -(match delta {
                         MouseScrollDelta::LineDelta(_, y) => y,
                         MouseScrollDelta::PixelDelta(pixel) => (pixel.y * 16.0) as f32,
-                    }) * DIFFERENCE_FROM_DEVICE_EVENT_ON_X11
+                    })
                 },
                 self.cursor_grabbed,
             )),
@@ -105,7 +105,7 @@ impl Window {
     pub fn handle_device_event(&mut self, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
             self.events.push(Event::MouseMove(
-                F32x2::new(delta.0 as f32, delta.1 as f32),
+                F32x2::new(delta.0 as f32, delta.1 as f32) * Self::MOTION_SENSITIVITY,
                 self.cursor_grabbed,
             ))
         }

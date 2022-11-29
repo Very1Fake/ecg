@@ -18,15 +18,12 @@ pub enum CameraMode {
     ThirdPerson {
         /// Position of the target
         target: F32x3,
-        /// Distance between camera and target
-        distance: f32,
     },
 }
 
 impl CameraMode {
     pub const DEFAULT_FORWARD: F32x3 = F32x3::ONE;
     pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
-    pub const DEFAULT_DISTANCE: f32 = 2.5;
 
     pub const fn first_person() -> Self {
         Self::FirstPerson {
@@ -37,7 +34,6 @@ impl CameraMode {
     pub const fn third_person() -> Self {
         Self::ThirdPerson {
             target: Self::DEFAULT_TARGET,
-            distance: Self::DEFAULT_DISTANCE,
         }
     }
 }
@@ -46,26 +42,51 @@ impl CameraMode {
 #[derive(Debug)]
 pub struct Camera {
     /// Eye position
-    pub position: F32x3,
+    pub pos: F32x3,
 
-    pub yaw: f32,
-    pub pitch: f32,
+    /// Camera rotation (yaw & pitch)
+    pub rot: F32x2,
 
     /// Camera mode
     pub mode: CameraMode,
+    /// Distance between camera and player
+    pub dist: f32,
 
     /// Projection aspect ratio
     pub aspect: f32,
-    /// Field of View degree
+    /// Field Of View
     pub fov: Rad,
     /// Near Z axis plane
     pub near: f32,
     /// Far Z axis plane
     pub far: f32,
+
+    // Camera smoothness
+    /// Desired position
+    pub f_pos: F32x3,
+    /// Desired camera rotation
+    pub f_rot: F32x2,
+    /// Desired distance between camera and player
+    pub f_dist: f32,
+    /// Desired Field Of View
+    pub f_fov: Rad,
+
+    // Settings
+    /// Interpolate camera position
+    pub smooth_position: bool,
+    /// Interpolate camera rotation
+    pub smooth_rotation: bool,
 }
 
 impl Camera {
+    // Utils
+    const POS_LERP_TIME: f32 = 0.1;
+    const ROT_LERP_TIME: f32 = 20.0;
+    const ROTATION_SCALE: f32 = 0.005;
+    const SWITCH_DISTANCE: f32 = 0.5;
+
     // Limits
+    pub const MIN_DISTANCE: f32 = 0.1;
     pub const MIN_FOV: f32 = FRAC_PI_6;
     pub const MAX_FOV: f32 = 2.356194;
     pub const MIN_Z_NEAR: f32 = 0.01; // FIX
@@ -75,8 +96,8 @@ impl Camera {
 
     // Defaults
     pub const DEFAULT_POSITION: F32x3 = F32x3::new(5.0, 0.5, 0.0);
-    pub const DEFAULT_YAW: f32 = -90.0;
-    pub const DEFAULT_PITCH: f32 = 15.0;
+    pub const DEFAULT_ORIENTATION: F32x2 = F32x2::new(-FRAC_PI_2, 0.08333);
+    pub const DEFAULT_DISTANCE: f32 = 2.5;
     pub const DEFAULT_FOV: f32 = 45.0;
     pub const Z_NEAR: f32 = 0.1;
     pub const Z_FAR: f32 = 100.0;
@@ -84,14 +105,20 @@ impl Camera {
     // TODO: Split camera and player logic
     pub fn new(aspect: f32) -> Self {
         Self {
-            position: Self::DEFAULT_POSITION,
-            yaw: Self::DEFAULT_YAW.to_radians(),
-            pitch: Self::DEFAULT_PITCH.to_radians(),
+            pos: Self::DEFAULT_POSITION,
+            rot: Self::DEFAULT_ORIENTATION,
             aspect,
             mode: CameraMode::third_person(),
+            dist: Self::DEFAULT_DISTANCE,
             fov: Self::DEFAULT_FOV.to_radians(),
             near: Self::Z_NEAR,
             far: Self::Z_FAR,
+            f_pos: Self::DEFAULT_POSITION,
+            f_rot: Self::DEFAULT_ORIENTATION,
+            f_dist: Self::DEFAULT_DISTANCE,
+            f_fov: Self::DEFAULT_FOV.to_radians(),
+            smooth_position: true,
+            smooth_rotation: false,
         }
     }
 
@@ -112,14 +139,109 @@ impl Camera {
     /// Camera view matrix moves the world to be at the position and rotation of the camera
     pub fn view_mat(&self) -> Matrix4 {
         match self.mode {
-            CameraMode::FirstPerson { forward } => {
-                Matrix4::look_to_lh(self.position, forward, F32x3::Y)
-            }
+            CameraMode::FirstPerson { forward } => Matrix4::look_to_lh(self.pos, forward, F32x3::Y),
             CameraMode::ThirdPerson { target, .. } => {
-                Matrix4::look_at_lh(self.position, target, F32x3::Y)
+                Matrix4::look_at_lh(self.pos, target, F32x3::Y)
             }
         }
     }
+
+    /// Rotate camera
+    pub fn rotate(&mut self, delta: F32x2) {
+        self.f_rot = clamp(self.f_rot + delta * Self::ROTATION_SCALE);
+    }
+
+    /// Handle zoom
+    pub fn zoom(&mut self, delta: f32) {
+        if delta > 0.0 || !matches!(self.mode, CameraMode::FirstPerson { .. }) {
+            let f_dist = self.dist + delta;
+            match self.mode {
+                CameraMode::FirstPerson { .. } => self.set_mode(CameraMode::ThirdPerson {
+                    target: CameraMode::DEFAULT_TARGET,
+                }),
+                CameraMode::ThirdPerson { .. } => {
+                    if f_dist < Self::SWITCH_DISTANCE {
+                        self.set_mode(CameraMode::FirstPerson {
+                            forward: CameraMode::DEFAULT_FORWARD,
+                        })
+                    } else {
+                        self.f_dist = f_dist;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Set camera mode
+    pub fn set_mode(&mut self, mode: CameraMode) {
+        match mode {
+            CameraMode::FirstPerson { .. } => {
+                self.mode = mode;
+                self.dist = Self::MIN_DISTANCE;
+            }
+            CameraMode::ThirdPerson { .. } => {
+                self.mode = mode;
+                self.dist = Self::DEFAULT_DISTANCE;
+            }
+        }
+    }
+
+    /// Update camera (basically dfo interpolation)
+    pub fn update(&mut self, duration: Duration) {
+        prof!(_guard, "Camera::update_camera");
+
+        let dur = duration.as_secs_f32();
+
+        // Interpolate camera distance
+        if (self.dist - self.f_dist).abs() > 0.01 {
+            self.dist = lerp(self.dist, self.f_dist, 0.75 * dur / Self::POS_LERP_TIME)
+        }
+
+        // Interpolate camera distance
+        if (self.fov - self.f_fov).abs() > 0.01 {
+            self.fov = lerp(self.fov, self.f_fov, 0.75 * dur / Self::POS_LERP_TIME)
+        }
+
+        // Interpolate camera position
+        if self.smooth_position {
+            if (self.pos - self.f_pos).length_squared() > 0.0001 {
+                self.pos = self.pos.lerp(self.f_pos, 0.75 * dur / Self::POS_LERP_TIME)
+            }
+        } else {
+            self.pos = self.f_pos;
+        }
+
+        // Interpolate camera rotation
+        self.rot = if self.smooth_rotation {
+            clamp(F32x2::new(
+                lerp_angle(self.rot.x, self.f_rot.x, Self::ROT_LERP_TIME * dur),
+                lerp(self.rot.y, self.f_rot.y, Self::ROT_LERP_TIME * dur),
+            ))
+        } else {
+            self.f_rot
+        };
+    }
+}
+
+fn lerp(lhs: f32, rhs: f32, f: f32) -> f32 {
+    // More precise, less performant
+    lhs * (1.0 - f) + (rhs * f)
+    // Less precise, more performant
+    // lhs + f * (rhs - lhs)
+}
+
+fn lerp_angle(lhs: f32, rhs: f32, f: f32) -> f32 {
+    lhs + f * {
+        let t = (rhs - lhs).rem_euclid(TAU);
+        (2.0 * t).rem_euclid(TAU) - t
+    }
+}
+
+fn clamp(rot: F32x2) -> F32x2 {
+    F32x2::new(
+        rot.x.rem_euclid(TAU),
+        rot.y.min(FRAC_PI_2 - 0.001).max(-FRAC_PI_2 + 0.001),
+    )
 }
 
 #[derive(Debug)]
@@ -130,15 +252,10 @@ pub struct CameraController {
     right: f32,
     up: f32,
     down: f32,
-    horizontal: f32,
-    vertical: f32,
-    zoom: f32,
-    sensitivity: f32,
 }
 
 impl CameraController {
     const SPEED: f32 = 2.0;
-    const MIN_DISTANCE: f32 = 0.5;
 
     /// Resets camera controller inputs
     pub fn reset(&mut self) {
@@ -148,9 +265,6 @@ impl CameraController {
         self.right = 0.0;
         self.up = 0.0;
         self.down = 0.0;
-        self.horizontal = 0.0;
-        self.vertical = 0.0;
-        self.zoom = 0.0;
     }
 
     /// Processes input from keyboard
@@ -179,37 +293,17 @@ impl CameraController {
         }
     }
 
-    /// Processes input from mouse
-    pub fn mouse_move(&mut self, delta: F32x2) {
-        // Yaw angle
-        self.horizontal = delta.x as f32;
-        // Pitch angle
-        self.vertical = delta.y as f32;
-    }
+    // TODO: Put in players logic
+    /// Updates camera position
+    pub fn move_camera(&mut self, camera: &mut Camera, duration: Duration) {
+        prof!(_guard, "Camera::move_camera");
 
-    /// Processes input from mouse wheel
-    pub fn mouse_wheel(&mut self, delta: f32) {
-        self.zoom = delta;
-    }
-
-    pub fn update_camera(&mut self, camera: &mut Camera, duration: Duration) {
-        prof!(_guard, "Camera::update_camera");
-
-        let duration = duration.as_secs_f32();
-        let modifier = Self::SPEED * duration;
-
-        // TODO: Use linear interpolation to smooth camera rotation
-        // Apply camera rotation
-        camera.yaw = (camera.yaw + self.horizontal.to_radians() * self.sensitivity * modifier)
-            .rem_euclid(TAU);
-        // Pitch angle safety
-        camera.pitch = (camera.pitch + self.vertical.to_radians() * self.sensitivity * modifier)
-            .min(FRAC_PI_2 - 0.001)
-            .max(-FRAC_PI_2 + 0.001);
+        let dur = duration.as_secs_f32();
+        let move_modifier = Self::SPEED * dur;
 
         // Common calculations
-        let (yaw_sin, yaw_cos) = camera.yaw.sin_cos();
-        let (pitch_sin, pitch_cos) = camera.pitch.sin_cos();
+        let (yaw_sin, yaw_cos) = camera.rot.x.sin_cos();
+        let (pitch_sin, pitch_cos) = camera.rot.y.sin_cos();
         let horizontal_forward = F32x3::new(yaw_sin, 0.0, yaw_cos).normalize();
         let horizontal_right = horizontal_forward.cross(F32x3::Y);
 
@@ -220,56 +314,34 @@ impl CameraController {
                 *forward = F32x3::new(yaw_sin, -pitch_sin, yaw_cos);
 
                 // Move up/down
-                camera.position.y += (self.up - self.down) * modifier;
+                camera.f_pos.y += (self.up - self.down) * move_modifier;
                 // Move forward/backward
-                camera.position += horizontal_forward * (self.forward - self.backward) * modifier;
+                camera.f_pos += horizontal_forward * (self.forward - self.backward) * move_modifier;
                 // Move left/right
-                camera.position += horizontal_right * (self.left - self.right) * modifier;
-
-                // Change camera FOV
-                // Also clamp FOV between 30 and 135 degrees
-                camera.fov = (camera.fov + -self.zoom * 0.5 * modifier)
-                    .clamp(Camera::MIN_FOV, Camera::MAX_FOV);
+                camera.f_pos += horizontal_right * (self.left - self.right) * move_modifier;
             }
-            CameraMode::ThirdPerson { target, distance } => {
-                // Zoom in/out
-                {
-                    let new =
-                        -((self.zoom * (*target - camera.position).length() * 0.75) * modifier);
-
-                    if *distance + new > Self::MIN_DISTANCE {
-                        *distance += new;
-                    } else {
-                        *distance = Self::MIN_DISTANCE;
-                    }
-                }
-
+            CameraMode::ThirdPerson { target } => {
                 // Move forward/backward
-                *target += horizontal_forward * (self.forward - self.backward) * modifier;
+                *target += horizontal_forward * (self.forward - self.backward) * move_modifier;
                 // Move left/right
-                *target += horizontal_right * (self.left - self.right) * modifier;
+                *target += horizontal_right * (self.left - self.right) * move_modifier;
                 // Move up/down
-                target.y += (self.up - self.down) * modifier;
+                target.y += (self.up - self.down) * move_modifier;
 
                 // Calculate camera position
                 {
-                    let hor_dist = *distance * pitch_cos;
-                    let vert_dist = *distance * pitch_sin;
+                    let hor_dist = camera.dist * pitch_cos;
+                    let vert_dist = camera.dist * pitch_sin;
 
                     let offset_x = hor_dist * yaw_sin;
                     let offset_z = hor_dist * yaw_cos;
 
-                    camera.position.x = target.x - offset_x;
-                    camera.position.z = target.z - offset_z;
-                    camera.position.y = target.y + vert_dist;
+                    camera.f_pos.x = target.x - offset_x;
+                    camera.f_pos.z = target.z - offset_z;
+                    camera.f_pos.y = target.y + vert_dist;
                 }
             }
         }
-
-        // Reset mouse inputs
-        self.zoom = 0.0;
-        self.horizontal = 0.0;
-        self.vertical = 0.0;
     }
 }
 
@@ -282,10 +354,6 @@ impl Default for CameraController {
             right: 0.0,
             up: 0.0,
             down: 0.0,
-            horizontal: 0.0,
-            vertical: 0.0,
-            zoom: 0.0,
-            sensitivity: 150.0,
         }
     }
 }
