@@ -85,7 +85,10 @@ impl Scene {
             model,
             globals_bind_group,
 
-            camera: Camera::new(resolution.x as f32 / resolution.y as f32),
+            camera: Camera::new(
+                resolution.x as f32 / resolution.y as f32,
+                CameraMode::FirstPerson,
+            ),
             camera_controller: CameraController::default(),
 
             pyramid_vertices: Buffer::new(&renderer.device, Vertex::PYRAMID, BufferUsages::VERTEX),
@@ -159,17 +162,17 @@ impl Scene {
         });
 
         // Update camera
+        self.camera.update(tick_dur);
         self.camera_controller
             .move_camera(&mut self.camera, tick_dur);
-        self.camera.update(tick_dur);
         game.window.renderer().update_consts(
             &self.model.globals,
             &[Globals::new(self.camera.proj_mat(), self.camera.view_mat())],
         );
 
         // Update voxel position
-        if let CameraMode::ThirdPerson { target, .. } = self.camera.mode {
-            self.voxel_instance.position = target;
+        if matches!(self.camera.mode, CameraMode::ThirdPerson) {
+            self.voxel_instance.position = self.camera.pos;
             game.window.renderer().update_dynamic_buffer(
                 &self.voxel_instance_buffer,
                 &[self.voxel_instance.as_raw()],

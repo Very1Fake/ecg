@@ -150,16 +150,9 @@ impl DebugOverlayState {
                             self.camera_opened = true;
                         }
                         if menu.button("Reset").clicked() {
-                            match &mut camera.mode {
-                                CameraMode::FirstPerson { forward } => {
-                                    *forward = CameraMode::DEFAULT_FORWARD
-                                }
-                                CameraMode::ThirdPerson { target } => {
-                                    *target = CameraMode::DEFAULT_TARGET;
-                                }
-                            }
+                            camera.f_pos = Camera::DEFAULT_POSITION;
                             camera.f_rot = Camera::DEFAULT_ORIENTATION;
-                            camera.set_mode(CameraMode::third_person());
+                            camera.set_mode(CameraMode::FirstPerson);
                         }
                     });
                     ui.separator();
@@ -260,7 +253,7 @@ impl DebugOverlayState {
                                     ))
                                     .clicked()
                                 {
-                                    camera.mode = CameraMode::first_person();
+                                    camera.set_mode(CameraMode::FirstPerson);
                                 }
                                 if ui
                                     .add(RadioButton::new(
@@ -269,7 +262,7 @@ impl DebugOverlayState {
                                     ))
                                     .clicked()
                                 {
-                                    camera.mode = CameraMode::ThirdPerson { target: camera.pos };
+                                    camera.set_mode(CameraMode::ThirdPerson);
                                 }
                             });
                             ui.end_row();

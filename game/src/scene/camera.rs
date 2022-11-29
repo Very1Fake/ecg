@@ -6,36 +6,13 @@ use std::{
 use common::prof;
 use winit::event::{ElementState, VirtualKeyCode};
 
-use crate::types::{F32x2, F32x3, Matrix4, Rad};
+use crate::types::{F32x2, F32x3, Mat4, Rad};
 
 /// Represents camera mode
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Eq, Debug)]
 pub enum CameraMode {
-    FirstPerson {
-        /// Direction which camera is facing
-        forward: F32x3,
-    },
-    ThirdPerson {
-        /// Position of the target
-        target: F32x3,
-    },
-}
-
-impl CameraMode {
-    pub const DEFAULT_FORWARD: F32x3 = F32x3::ONE;
-    pub const DEFAULT_TARGET: F32x3 = F32x3::ZERO;
-
-    pub const fn first_person() -> Self {
-        Self::FirstPerson {
-            forward: Self::DEFAULT_FORWARD,
-        }
-    }
-
-    pub const fn third_person() -> Self {
-        Self::ThirdPerson {
-            target: Self::DEFAULT_TARGET,
-        }
-    }
+    FirstPerson,
+    ThirdPerson,
 }
 
 /// Represents camera and its dependents state
@@ -43,7 +20,6 @@ impl CameraMode {
 pub struct Camera {
     /// Eye position
     pub pos: F32x3,
-
     /// Camera rotation (yaw & pitch)
     pub rot: F32x2,
 
@@ -103,19 +79,24 @@ impl Camera {
     pub const Z_FAR: f32 = 100.0;
 
     // TODO: Split camera and player logic
-    pub fn new(aspect: f32) -> Self {
+    pub fn new(aspect: f32, mode: CameraMode) -> Self {
+        let dist = match mode {
+            CameraMode::FirstPerson => Self::MIN_DISTANCE,
+            CameraMode::ThirdPerson => Self::DEFAULT_DISTANCE,
+        };
+
         Self {
             pos: Self::DEFAULT_POSITION,
             rot: Self::DEFAULT_ORIENTATION,
             aspect,
-            mode: CameraMode::third_person(),
-            dist: Self::DEFAULT_DISTANCE,
+            mode: CameraMode::FirstPerson,
+            dist,
             fov: Self::DEFAULT_FOV.to_radians(),
             near: Self::Z_NEAR,
             far: Self::Z_FAR,
             f_pos: Self::DEFAULT_POSITION,
             f_rot: Self::DEFAULT_ORIENTATION,
-            f_dist: Self::DEFAULT_DISTANCE,
+            f_dist: dist,
             f_fov: Self::DEFAULT_FOV.to_radians(),
             smooth_position: true,
             smooth_rotation: false,
@@ -130,20 +111,18 @@ impl Camera {
     /// Calculate projection matrix
     ///
     /// Projection matrix warps the scene to give the effect of depth
-    pub fn proj_mat(&self) -> Matrix4 {
-        Matrix4::perspective_lh(self.fov, self.aspect, self.near, self.far)
+    pub fn proj_mat(&self) -> Mat4 {
+        Mat4::perspective_lh(self.fov, self.aspect, self.near, self.far)
     }
 
     /// Calculate camera view matrix
     ///
     /// Camera view matrix moves the world to be at the position and rotation of the camera
-    pub fn view_mat(&self) -> Matrix4 {
-        match self.mode {
-            CameraMode::FirstPerson { forward } => Matrix4::look_to_lh(self.pos, forward, F32x3::Y),
-            CameraMode::ThirdPerson { target, .. } => {
-                Matrix4::look_at_lh(self.pos, target, F32x3::Y)
-            }
-        }
+    pub fn view_mat(&self) -> Mat4 {
+        Mat4::from_translation(F32x3::new(0.0, 0.0, self.dist))
+            * Mat4::from_rotation_x(-self.rot.y)
+            * Mat4::from_rotation_y(-self.rot.x)
+            * Mat4::from_translation(-self.pos)
     }
 
     /// Rotate camera
@@ -156,14 +135,10 @@ impl Camera {
         if delta > 0.0 || !matches!(self.mode, CameraMode::FirstPerson { .. }) {
             let f_dist = self.dist + delta;
             match self.mode {
-                CameraMode::FirstPerson { .. } => self.set_mode(CameraMode::ThirdPerson {
-                    target: CameraMode::DEFAULT_TARGET,
-                }),
+                CameraMode::FirstPerson { .. } => self.set_mode(CameraMode::ThirdPerson),
                 CameraMode::ThirdPerson { .. } => {
                     if f_dist < Self::SWITCH_DISTANCE {
-                        self.set_mode(CameraMode::FirstPerson {
-                            forward: CameraMode::DEFAULT_FORWARD,
-                        })
+                        self.set_mode(CameraMode::FirstPerson)
                     } else {
                         self.f_dist = f_dist;
                     }
@@ -177,11 +152,11 @@ impl Camera {
         match mode {
             CameraMode::FirstPerson { .. } => {
                 self.mode = mode;
-                self.dist = Self::MIN_DISTANCE;
+                self.f_dist = Self::MIN_DISTANCE;
             }
             CameraMode::ThirdPerson { .. } => {
                 self.mode = mode;
-                self.dist = Self::DEFAULT_DISTANCE;
+                self.f_dist = Self::DEFAULT_DISTANCE;
             }
         }
     }
@@ -220,6 +195,12 @@ impl Camera {
         } else {
             self.f_rot
         };
+    }
+
+    /// Get camera forward unit vector on the XY plane
+    pub fn forward_xy(&self) -> F32x3 {
+        let (yaw_sin, yaw_cos) = self.rot.x.sin_cos();
+        F32x3::new(yaw_sin, 0.0, yaw_cos)
     }
 }
 
@@ -302,46 +283,15 @@ impl CameraController {
         let move_modifier = Self::SPEED * dur;
 
         // Common calculations
-        let (yaw_sin, yaw_cos) = camera.rot.x.sin_cos();
-        let (pitch_sin, pitch_cos) = camera.rot.y.sin_cos();
-        let horizontal_forward = F32x3::new(yaw_sin, 0.0, yaw_cos).normalize();
-        let horizontal_right = horizontal_forward.cross(F32x3::Y);
+        let forward = camera.forward_xy();
+        let right = forward.cross(F32x3::Y);
 
-        // Move camera/target
-        match &mut camera.mode {
-            CameraMode::FirstPerson { forward } => {
-                // Camera rotation
-                *forward = F32x3::new(yaw_sin, -pitch_sin, yaw_cos);
-
-                // Move up/down
-                camera.f_pos.y += (self.up - self.down) * move_modifier;
-                // Move forward/backward
-                camera.f_pos += horizontal_forward * (self.forward - self.backward) * move_modifier;
-                // Move left/right
-                camera.f_pos += horizontal_right * (self.left - self.right) * move_modifier;
-            }
-            CameraMode::ThirdPerson { target } => {
-                // Move forward/backward
-                *target += horizontal_forward * (self.forward - self.backward) * move_modifier;
-                // Move left/right
-                *target += horizontal_right * (self.left - self.right) * move_modifier;
-                // Move up/down
-                target.y += (self.up - self.down) * move_modifier;
-
-                // Calculate camera position
-                {
-                    let hor_dist = camera.dist * pitch_cos;
-                    let vert_dist = camera.dist * pitch_sin;
-
-                    let offset_x = hor_dist * yaw_sin;
-                    let offset_z = hor_dist * yaw_cos;
-
-                    camera.f_pos.x = target.x - offset_x;
-                    camera.f_pos.z = target.z - offset_z;
-                    camera.f_pos.y = target.y + vert_dist;
-                }
-            }
-        }
+        // Move forward/backward
+        camera.f_pos += forward * (self.forward - self.backward) * move_modifier;
+        // Move left/right
+        camera.f_pos += right * (self.left - self.right) * move_modifier;
+        // Move up/down
+        camera.f_pos.y += (self.up - self.down) * move_modifier;
     }
 }
 

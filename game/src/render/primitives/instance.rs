@@ -5,7 +5,7 @@ use wgpu::{vertex_attr_array, BufferAddress, VertexAttribute, VertexBufferLayout
 
 use crate::{
     render::buffer::Bufferable,
-    types::{F32x3, Matrix4, Rotation},
+    types::{F32x3, Mat4, Rotation},
 };
 
 /// Represents instance options
@@ -27,7 +27,7 @@ impl Instance {
 
     pub fn as_raw(&self) -> RawInstance {
         RawInstance {
-            model: Matrix4::from_translation(self.position),
+            model: Mat4::from_translation(self.position),
         }
     }
 }
@@ -36,7 +36,7 @@ impl Instance {
 #[repr(C)]
 #[derive(Pod, Zeroable, Clone, Copy, Debug)]
 pub struct RawInstance {
-    model: Matrix4,
+    model: Mat4,
 }
 
 impl RawInstance {

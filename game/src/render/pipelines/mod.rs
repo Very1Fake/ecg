@@ -6,7 +6,7 @@ use wgpu::{
 
 use crate::{
     test_buffer_align,
-    types::{Matrix4, RawMatrix4},
+    types::{Mat4, RawMat4},
 };
 
 use super::{
@@ -24,11 +24,11 @@ pub mod terrain;
 #[derive(Pod, Zeroable, Clone, Copy)]
 pub struct Globals {
     /// Projection matrix
-    proj_mat: RawMatrix4,
+    proj_mat: RawMat4,
     /// Camera view matrix
-    view_mat: RawMatrix4,
+    view_mat: RawMat4,
     /// proj_mat * view_mat
-    all_mat: RawMatrix4,
+    all_mat: RawMat4,
 }
 
 impl Bufferable for Globals {
@@ -36,7 +36,7 @@ impl Bufferable for Globals {
 }
 
 impl Globals {
-    pub fn new(proj_mat: Matrix4, view_mat: Matrix4) -> Self {
+    pub fn new(proj_mat: Mat4, view_mat: Mat4) -> Self {
         Self {
             proj_mat: proj_mat.to_cols_array_2d(),
             view_mat: view_mat.to_cols_array_2d(),
@@ -47,7 +47,7 @@ impl Globals {
 
 impl Default for Globals {
     fn default() -> Self {
-        Self::new(Matrix4::IDENTITY, Matrix4::IDENTITY)
+        Self::new(Mat4::IDENTITY, Mat4::IDENTITY)
     }
 }
 
