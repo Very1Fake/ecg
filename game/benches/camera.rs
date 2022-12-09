@@ -15,7 +15,7 @@ pub fn view_mat_bench(c: &mut Criterion) {
         OldCameraMode::FirstPerson { forward } => Mat4::look_to_lh(pos, forward, F32x3::Y),
         OldCameraMode::ThirdPerson { target } => Mat4::look_at_lh(pos, target, F32x3::Y),
     };
-    
+
     // Current camera view matrix function
     let new = || {
         Mat4::from_translation(F32x3::new(0.0, 0.0, dist))
@@ -26,8 +26,8 @@ pub fn view_mat_bench(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Camera View Matrix");
 
-    group.bench_function("old", |b| b.iter(|| old()));
-    group.bench_function("new", |b| b.iter(|| new()));
+    group.bench_function("old", |b| b.iter(old));
+    group.bench_function("new", |b| b.iter(new));
 
     group.finish();
 }

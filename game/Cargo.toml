@@ -39,3 +39,7 @@ criterion = "0.4"
 [[bench]]
 name = "camera"
 harness = false
+
+[[bench]]
+name = "mesh"
+harness = false
