@@ -2,9 +2,11 @@
 members = ["./game", "./common"]
 resolver = "2"
 
+[workspace.dependencies]
+glam = { version = "0.22", features = ["bytemuck", "fast-math"] }
+
 [profile.final]
 inherits = "release"
 strip = true
 lto = true
 codegen-units = 1
-

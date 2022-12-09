@@ -7,6 +7,7 @@ edition = "2021"
 tracy = ["tracy-client"]
 
 [dependencies]
+glam.workspace = true
 spin_sleep = "1.1"
 tracing = { version = "0.1", default-features = false }
 
