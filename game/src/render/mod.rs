@@ -2,6 +2,7 @@ use wgpu::PresentMode;
 
 pub mod buffer;
 pub mod error;
+pub mod mesh;
 pub mod model;
 pub mod pipelines;
 pub mod primitives;

@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use common::span;
+use common::{coord::ChunkCoord, span};
 use wgpu::BufferUsages;
 use winit::event::{ElementState, VirtualKeyCode};
 
@@ -14,6 +14,7 @@ use crate::{
         },
         renderer::drawer::FirstPassDrawer,
     },
+    scene::chunk::LogicChunk,
     types::{F32x3, Rotation},
     window::{
         event::{Event, Input},
@@ -24,10 +25,12 @@ use crate::{
 
 use self::{
     camera::{Camera, CameraController, CameraMode},
+    chunk::ChunkManager,
     figure::voxel::Voxel,
 };
 
 pub mod camera;
+pub mod chunk;
 pub mod figure;
 
 // FIX: Make implement PlayState to handle events
@@ -40,6 +43,9 @@ pub struct Scene {
     // Camera
     pub camera: Camera,
     pub camera_controller: CameraController,
+
+    // World
+    pub chunk_manager: ChunkManager,
 
     // Objects
     pub pyramid_vertices: Buffer<Vertex>,
@@ -81,6 +87,11 @@ impl Scene {
         let voxel_instance_buffer = DynamicBuffer::new(&renderer.device, 1, BufferUsages::VERTEX);
         voxel_instance_buffer.update(&renderer.queue, &[voxel_instance.as_raw()], 0);
 
+        let mut chunk_manager = ChunkManager::default();
+        chunk_manager
+            .logic
+            .insert(ChunkCoord::ZERO, LogicChunk::new());
+
         Self {
             model,
             globals_bind_group,
@@ -90,6 +101,8 @@ impl Scene {
                 CameraMode::FirstPerson,
             ),
             camera_controller: CameraController::default(),
+
+            chunk_manager,
 
             pyramid_vertices: Buffer::new(&renderer.device, Vertex::PYRAMID, BufferUsages::VERTEX),
             pyramid_indices: Buffer::new(&renderer.device, Vertex::INDICES, BufferUsages::INDEX),
@@ -170,6 +183,8 @@ impl Scene {
             &[Globals::new(self.camera.proj_mat(), self.camera.view_mat())],
         );
 
+        self.chunk_manager.maintain(&game.window.renderer().device);
+
         // Update voxel position
         if matches!(self.camera.mode, CameraMode::ThirdPerson) {
             self.voxel_instance.position = self.camera.pos;
@@ -189,7 +204,17 @@ impl Scene {
         span!(_guard, "draw", "Scene::draw");
 
         // Draw "terrain"
-        drawer.draw_pyramid(&self.pyramid_vertices, &self.pyramid_indices);
+        {
+            // Test pyramid
+            drawer.draw_pyramid(&self.pyramid_vertices, &self.pyramid_indices);
+
+            let mut drawer = drawer.terrain_drawer();
+
+            self.chunk_manager
+                .terrain
+                .values()
+                .for_each(|chunk| drawer.draw(chunk));
+        }
 
         // Draw figures
         drawer.draw_figure(&self.voxel, &self.voxel_instance_buffer);

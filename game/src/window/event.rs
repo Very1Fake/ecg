@@ -103,9 +103,14 @@ impl Window {
     }
 
     pub fn handle_device_event(&mut self, event: DeviceEvent) {
+        #[cfg(target_os = "linux")]
+        const MOTION_FIX: f32 = 0.1;
+        #[cfg(not(target_os = "linux"))]
+        const MOTION_FIX: f32 = 1.0;
+
         if let DeviceEvent::MouseMotion { delta } = event {
             self.events.push(Event::MouseMove(
-                F32x2::new(delta.0 as f32, delta.1 as f32) * Self::MOTION_SENSITIVITY,
+                F32x2::new(delta.0 as f32, delta.1 as f32) * Self::MOTION_SENSITIVITY * MOTION_FIX,
                 self.cursor_grabbed,
             ))
         }

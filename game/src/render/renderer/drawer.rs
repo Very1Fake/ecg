@@ -5,13 +5,14 @@ use wgpu::{
     RenderPassColorAttachment, RenderPassDepthStencilAttachment, RenderPassDescriptor,
     SurfaceTexture, TextureView, TextureViewDescriptor,
 };
-use wgpu_profiler::scope::{ManualOwningScope, OwningScope};
+use wgpu_profiler::scope::{ManualOwningScope, OwningScope, Scope};
 
 use crate::render::buffer::{Buffer, DynamicBuffer};
 use crate::render::pipelines::GlobalsBindGroup;
 
 use crate::render::primitives::instance::RawInstance;
 use crate::render::{model::Model, primitives::vertex::Vertex, texture::Texture};
+use crate::scene::chunk::TerrainChunk;
 
 use super::pipelines::Pipelines;
 use super::Renderer;
@@ -218,6 +219,15 @@ impl<'pass> FirstPassDrawer<'pass> {
         render_pass.draw_indexed(0..Vertex::INDICES.len() as u32, 0, 0..1);
     }
 
+    /// Returns TerrainDrawer
+    pub fn terrain_drawer(&mut self) -> TerrainDrawer<'_, 'pass> {
+        let mut render_pass = self.render_pass.scope("terrain", self.renderer.device);
+
+        render_pass.set_pipeline(&self.pipelines.terrain.inner);
+
+        TerrainDrawer { render_pass }
+    }
+
     // FIX: Make `FiguresDrawer` sub drawer for this operation
     pub fn draw_figure<T: Model>(
         &mut self,
@@ -234,5 +244,22 @@ impl<'pass> FirstPassDrawer<'pass> {
         render_pass.set_index_buffer(index_buffer.slice(..), IndexFormat::Uint16);
         // TODO: Make safe cast
         render_pass.draw_indexed(0..count, 0, 0..instances.length() as u32);
+    }
+}
+
+#[must_use]
+pub struct TerrainDrawer<'pass_ref, 'pass: 'pass_ref> {
+    render_pass: Scope<'pass_ref, RenderPass<'pass>>,
+}
+
+impl<'pass_ref, 'pass: 'pass_ref> TerrainDrawer<'pass_ref, 'pass> {
+    /// Draw terrain chunk
+    pub fn draw(&mut self, chunk: &'pass TerrainChunk) {
+        self.render_pass
+            .set_vertex_buffer(0, chunk.vertex_buffer.buffer.slice(..));
+        self.render_pass
+            .set_index_buffer(chunk.index_buffer.buffer.slice(..), IndexFormat::Uint32);
+        self.render_pass
+            .draw_indexed(0..chunk.index_buffer.length() as u32, 0, 0..1);
     }
 }
