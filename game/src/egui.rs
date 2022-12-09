@@ -2,10 +2,14 @@
 
 use std::time::Instant;
 
-use common::clock::ClockStats;
+use common::{
+    block::{Block, BlockRepr},
+    clock::ClockStats,
+    coord::{ChunkCoord, GlobalCoord, CHUNK_CUBE},
+};
 use egui::{
-    global_dark_light_mode_switch, ComboBox, Context, FontDefinitions, Grid, RadioButton, Slider,
-    Style, TopBottomPanel, Window,
+    global_dark_light_mode_switch, ComboBox, Context, DragValue, FontDefinitions, Grid,
+    RadioButton, Slider, Style, TopBottomPanel, Window,
 };
 use egui_winit_platform::{Platform, PlatformDescriptor};
 use wgpu::PresentMode;
@@ -108,9 +112,12 @@ pub struct DebugOverlayState {
     gpu_timing_opened: bool,
     /// Camera tweaks window
     camera_opened: bool,
+    /// Block changer
+    painter_opened: bool,
 
-    // SubStates
+    // Sub states
     graphics_tweaks: GraphicsTweaks,
+    painter: Painter,
 }
 
 impl DebugOverlayState {
@@ -120,7 +127,9 @@ impl DebugOverlayState {
             graphics_opened: false,
             gpu_timing_opened: false,
             camera_opened: false,
+            painter_opened: false,
             graphics_tweaks: GraphicsTweaks::new(),
+            painter: Painter::new(),
         }
     }
 
@@ -153,6 +162,11 @@ impl DebugOverlayState {
                             camera.f_pos = Camera::DEFAULT_POSITION;
                             camera.f_rot = Camera::DEFAULT_ORIENTATION;
                             camera.set_mode(CameraMode::FirstPerson);
+                        }
+                    });
+                    ui.menu_button("Cheats", |menu| {
+                        if menu.button("Painter").clicked() {
+                            self.painter_opened = true;
                         }
                     });
                     ui.separator();
@@ -341,6 +355,108 @@ impl DebugOverlayState {
                     ));
                 });
             });
+
+        Window::new("Painter")
+            .open(&mut self.painter_opened)
+            .resizable(false)
+            .show(ctx, |ui| {
+                ui.add(
+                    DragValue::new(&mut self.painter.block)
+                        .clamp_range(Block::MIN..=Block::MAX)
+                        .custom_formatter(|id, _| {
+                            format!("Selected Block: {:?}", Block::from(id as BlockRepr))
+                        }),
+                );
+
+                ui.group(|ui| {
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Block Changer");
+
+                            if ui.button("Set").clicked() {
+                                if let Some(chunk) = payload
+                                    .scene
+                                    .chunk_manager
+                                    .logic
+                                    .get_mut(&self.painter.block_pos.to_chunk())
+                                {
+                                    chunk.blocks_mut()
+                                        [self.painter.block_pos.to_block().flatten() as usize] =
+                                        Block::from(self.painter.block);
+                                }
+                            }
+                        });
+
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                DragValue::new(&mut self.painter.block_pos.x)
+                                    .prefix("x: ")
+                                    .fixed_decimals(0)
+                                    .speed(1.0),
+                            );
+                            ui.add(
+                                DragValue::new(&mut self.painter.block_pos.y)
+                                    .prefix("y: ")
+                                    .fixed_decimals(0)
+                                    .speed(1.0),
+                            );
+                            ui.add(
+                                DragValue::new(&mut self.painter.block_pos.z)
+                                    .prefix("z: ")
+                                    .fixed_decimals(0)
+                                    .speed(1.0),
+                            );
+                        });
+                    });
+                });
+
+                ui.group(|ui| {
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.label("Chunk Filler");
+                            if ui.button("Fill").clicked() {
+                                if let Some(chunk) = payload
+                                    .scene
+                                    .chunk_manager
+                                    .logic
+                                    .get_mut(&self.painter.chunk_pos)
+                                {
+                                    *chunk.blocks_box() =
+                                        vec![Block::from(self.painter.block); CHUNK_CUBE]
+                                            .into_boxed_slice();
+                                }
+                            }
+                        });
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                DragValue::new(&mut self.painter.chunk_pos.x)
+                                    .prefix("x: ")
+                                    .fixed_decimals(0)
+                                    .speed(1.0),
+                            );
+                            ui.add(
+                                DragValue::new(&mut self.painter.chunk_pos.y)
+                                    .prefix("y: ")
+                                    .fixed_decimals(0)
+                                    .speed(1.0),
+                            );
+                            ui.add(
+                                DragValue::new(&mut self.painter.chunk_pos.z)
+                                    .prefix("z: ")
+                                    .fixed_decimals(0)
+                                    .speed(1.0),
+                            );
+                        });
+                    });
+                });
+
+                // ui.vertical_centered(|ui| {
+                // TODO: Add button to set position to camera
+                if ui.button("Reset").clicked() {
+                    self.painter = Painter::new();
+                }
+                // });
+            });
     }
 }
 
@@ -360,6 +476,22 @@ impl GraphicsTweaks {
     pub fn as_render_mode(&self) -> RenderMode {
         RenderMode {
             present_mode: self.present_mode,
+        }
+    }
+}
+
+pub struct Painter {
+    block_pos: GlobalCoord,
+    chunk_pos: ChunkCoord,
+    block: BlockRepr,
+}
+
+impl Painter {
+    pub const fn new() -> Self {
+        Self {
+            block_pos: GlobalCoord::ZERO,
+            chunk_pos: ChunkCoord::ZERO,
+            block: Block::Stone as BlockRepr,
         }
     }
 }
