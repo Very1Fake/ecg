@@ -59,4 +59,8 @@ impl TerrainMesh {
 
         Self { vertices, indices }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.vertices.is_empty()
+    }
 }

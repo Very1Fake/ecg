@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use common::{
     block::Block,
-    coord::{ChunkCoord, CHUNK_SQUARE},
+    coord::{ChunkCoord, CHUNK_SQUARE, G_CHUNK_SIZE},
     span,
 };
 use wgpu::BufferUsages;
@@ -92,16 +92,26 @@ impl Scene {
         voxel_instance_buffer.update(&renderer.queue, &[voxel_instance.as_raw()], 0);
 
         let mut chunk_manager = ChunkManager::default();
-        chunk_manager.logic.insert(ChunkCoord::ZERO, {
-            let mut chunk = LogicChunk::new();
-            chunk
-                .blocks_mut()
-                .iter_mut()
-                .skip(CHUNK_SQUARE * 8)
-                .zip(Block::ALL.iter())
-                .for_each(|(block, block_type)| *block = *block_type);
-            chunk
+
+        (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|x| {
+            (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|y| {
+                (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|z| {
+                    chunk_manager
+                        .logic
+                        .insert(ChunkCoord::new(x, y, z), LogicChunk::new());
+                });
+            });
         });
+
+        chunk_manager
+            .logic
+            .get_mut(&ChunkCoord::ZERO)
+            .unwrap()
+            .blocks_mut()
+            .iter_mut()
+            .skip(CHUNK_SQUARE * 8)
+            .zip(Block::ALL.iter())
+            .for_each(|(block, block_type)| *block = *block_type);
 
         Self {
             model,

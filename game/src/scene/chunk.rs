@@ -24,10 +24,11 @@ impl ChunkManager {
             .iter_mut()
             .filter(|(_, chunk)| chunk.is_dirty())
             .for_each(|(coord, chunk)| {
-                self.terrain.insert(
-                    *coord,
-                    TerrainChunk::new(device, TerrainMesh::build(*coord, &chunk.blocks)),
-                );
+                let mesh = TerrainMesh::build(*coord, &chunk.blocks);
+
+                if !mesh.is_empty() {
+                    self.terrain.insert(*coord, TerrainChunk::new(device, mesh));
+                }
                 chunk.dirty = false;
             });
     }
