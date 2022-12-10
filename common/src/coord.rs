@@ -57,9 +57,9 @@ pub struct ChunkCoord {
 impl ChunkCoord {
     pub fn to_global(&self, block: &BlockCoord) -> GlobalCoord {
         GlobalCoord::new(
-            self.x + block.x as GlobalUnit,
-            self.y + block.y as GlobalUnit,
-            self.z + block.z as GlobalUnit,
+            self.x * G_CHUNK_SIZE + block.x as GlobalUnit,
+            self.y * G_CHUNK_SIZE + block.y as GlobalUnit,
+            self.z * G_CHUNK_SIZE + block.z as GlobalUnit,
         )
     }
 }
