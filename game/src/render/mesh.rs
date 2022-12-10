@@ -4,10 +4,7 @@ use common::{
     prof,
 };
 
-use crate::{
-    render::primitives::{direction::Direction, quad::Quad},
-    types::F32x3,
-};
+use crate::render::primitives::{direction::Direction, quad::Quad};
 
 use super::primitives::vertex::Vertex;
 
@@ -28,8 +25,8 @@ impl TerrainMesh {
         blocks
             .iter()
             .enumerate()
-            .filter(|(_, &block)| block != Block::Air)
-            .for_each(|(flat_coord, _)| {
+            .filter(|(_, &block)| block.opaque())
+            .for_each(|(flat_coord, block)| {
                 let pos = coord
                     .to_global(&BlockCoord::from(flat_coord as i64))
                     .as_vec();
@@ -41,7 +38,7 @@ impl TerrainMesh {
                             .into_iter()
                             .map(|position| Vertex {
                                 position: position * 0.1,
-                                color: F32x3::new(1.0, 0.1, 0.1),
+                                color: block.color(),
                             })
                     })
                     .collect::<Vec<_>>();
