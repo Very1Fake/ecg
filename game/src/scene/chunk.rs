@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common::{
     block::Block,
-    coord::{ChunkCoord, CHUNK_CUBE},
+    coord::{ChunkId, CHUNK_CUBE},
     span,
 };
 use wgpu::{BufferUsages, Device};
@@ -11,8 +11,8 @@ use crate::render::{buffer::Buffer, mesh::TerrainMesh, primitives::vertex::Verte
 
 #[derive(Default)]
 pub struct ChunkManager {
-    pub logic: HashMap<ChunkCoord, LogicChunk>,
-    pub terrain: HashMap<ChunkCoord, TerrainChunk>,
+    pub logic: HashMap<ChunkId, LogicChunk>,
+    pub terrain: HashMap<ChunkId, TerrainChunk>,
 }
 
 impl ChunkManager {
@@ -24,9 +24,12 @@ impl ChunkManager {
             .iter_mut()
             .filter(|(_, chunk)| chunk.is_dirty())
             .for_each(|(coord, chunk)| {
-                let mesh = TerrainMesh::build(*coord, &chunk.blocks);
+                // TODO: Add a check for an empty mesh when it'll be aware of neighboring blocks
+                // Check if chunk has at least one opaque block. Otherwise skip mesh building
+                if let Some(_) = chunk.blocks.iter().filter(|block| block.opaque()).next() {
+                    let mesh = TerrainMesh::build(coord.to_coord(), &chunk.blocks);
+                    tracing::debug!(?coord, "Building mesh for chunk");
 
-                if !mesh.is_empty() {
                     self.terrain.insert(*coord, TerrainChunk::new(device, mesh));
                 }
                 chunk.dirty = false;

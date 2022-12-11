@@ -5,7 +5,7 @@ use std::time::Instant;
 use common::{
     block::{Block, BlockRepr},
     clock::ClockStats,
-    coord::{ChunkCoord, GlobalCoord, CHUNK_CUBE},
+    coord::{ChunkId, GlobalCoord, CHUNK_CUBE},
 };
 use egui::{
     global_dark_light_mode_switch, ComboBox, Context, DragValue, FontDefinitions, Grid,
@@ -378,7 +378,7 @@ impl DebugOverlayState {
                                     .scene
                                     .chunk_manager
                                     .logic
-                                    .get_mut(&self.painter.block_pos.to_chunk())
+                                    .get_mut(&self.painter.block_pos.to_chunk_id())
                                 {
                                     chunk.blocks_mut()
                                         [self.painter.block_pos.to_block().flatten() as usize] =
@@ -419,7 +419,7 @@ impl DebugOverlayState {
                                     .scene
                                     .chunk_manager
                                     .logic
-                                    .get_mut(&self.painter.chunk_pos)
+                                    .get_mut(&self.painter.chunk_id)
                                 {
                                     *chunk.blocks_box() =
                                         vec![Block::from(self.painter.block); CHUNK_CUBE]
@@ -429,19 +429,19 @@ impl DebugOverlayState {
                         });
                         ui.horizontal(|ui| {
                             ui.add(
-                                DragValue::new(&mut self.painter.chunk_pos.x)
+                                DragValue::new(&mut self.painter.chunk_id.x)
                                     .prefix("x: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
                             );
                             ui.add(
-                                DragValue::new(&mut self.painter.chunk_pos.y)
+                                DragValue::new(&mut self.painter.chunk_id.y)
                                     .prefix("y: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
                             );
                             ui.add(
-                                DragValue::new(&mut self.painter.chunk_pos.z)
+                                DragValue::new(&mut self.painter.chunk_id.z)
                                     .prefix("z: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
@@ -482,7 +482,7 @@ impl GraphicsTweaks {
 
 pub struct Painter {
     block_pos: GlobalCoord,
-    chunk_pos: ChunkCoord,
+    chunk_id: ChunkId,
     block: BlockRepr,
 }
 
@@ -490,7 +490,7 @@ impl Painter {
     pub const fn new() -> Self {
         Self {
             block_pos: GlobalCoord::ZERO,
-            chunk_pos: ChunkCoord::ZERO,
+            chunk_id: ChunkId::ZERO,
             block: Block::Stone as BlockRepr,
         }
     }

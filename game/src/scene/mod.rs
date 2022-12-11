@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use common::{
     block::Block,
-    coord::{ChunkCoord, CHUNK_SQUARE, G_CHUNK_SIZE},
+    coord::{ChunkId, CHUNK_SQUARE, G_CHUNK_SIZE},
     span,
 };
 use wgpu::BufferUsages;
@@ -98,14 +98,14 @@ impl Scene {
                 (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|z| {
                     chunk_manager
                         .logic
-                        .insert(ChunkCoord::new(x, y, z), LogicChunk::new());
+                        .insert(ChunkId::new(x, y, z), LogicChunk::new());
                 });
             });
         });
 
         chunk_manager
             .logic
-            .get_mut(&ChunkCoord::ZERO)
+            .get_mut(&ChunkId::ZERO)
             .unwrap()
             .blocks_mut()
             .iter_mut()

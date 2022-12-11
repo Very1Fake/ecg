@@ -38,7 +38,7 @@ pub enum Block {
 }
 
 impl Block {
-    pub const MIN: BlockRepr = 0;
+    pub const MIN: BlockRepr = Self::Void as BlockRepr;
     pub const MAX: BlockRepr = Self::Ice as BlockRepr;
 
     pub const ALL: [Self; 18] = [
@@ -68,7 +68,7 @@ impl Block {
 
     #[inline]
     pub fn opaque(&self) -> bool {
-        !matches!(self, Self::Air)
+        !matches!(self, Self::Air | Self::Void)
     }
 
     #[inline]
@@ -111,12 +111,25 @@ impl Block {
 impl From<BlockRepr> for Block {
     fn from(id: BlockRepr) -> Self {
         match id {
-            0 => Self::Air,
-            1 => Self::Stone,
-            2 => Self::Grass,
-            3 => Self::Sand,
-            4 => Self::Leaves,
-            _ => Self::Air,
+            0 => Self::Void,
+            1 => Self::Air,
+            2 => Self::Stone,
+            3 => Self::Dirt,
+            4 => Self::Grass,
+            5 => Self::Leaves,
+            6 => Self::Water,
+            7 => Self::MovingWater,
+            8 => Self::Magma,
+            9 => Self::MovingMagma,
+            10 => Self::Lava,
+            11 => Self::MovingLava,
+            12 => Self::SandStone,
+            13 => Self::Sand,
+            14 => Self::Clay,
+            15 => Self::Mud,
+            16 => Self::SnowBlock,
+            17 => Self::Ice,
+            _ => Self::Void,
         }
     }
 }

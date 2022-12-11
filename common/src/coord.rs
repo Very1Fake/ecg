@@ -1,3 +1,5 @@
+use std::ops::{Add, Mul};
+
 use glam::Vec3;
 
 pub type GlobalUnit = i64;
@@ -41,8 +43,28 @@ macro_rules! coord_base_impl {
     };
 }
 
-coord_base_impl!(GlobalUnit, ChunkCoord, GlobalCoord);
+coord_base_impl!(GlobalUnit, ChunkId, ChunkCoord, GlobalCoord);
 coord_base_impl!(LocalUnit, BlockCoord);
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Represents chunk id
+#[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
+pub struct ChunkId {
+    pub x: GlobalUnit,
+    pub y: GlobalUnit,
+    pub z: GlobalUnit,
+}
+
+impl ChunkId {
+    pub fn to_coord(&self) -> ChunkCoord {
+        ChunkCoord::new(
+            self.x * G_CHUNK_SIZE,
+            self.y * G_CHUNK_SIZE,
+            self.z * G_CHUNK_SIZE,
+        )
+    }
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -55,11 +77,19 @@ pub struct ChunkCoord {
 }
 
 impl ChunkCoord {
+    pub fn new_checked(x: GlobalUnit, y: GlobalUnit, z: GlobalUnit) -> Self {
+        Self {
+            x: x.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+            y: y.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+            z: z.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+        }
+    }
+
     pub fn to_global(&self, block: &BlockCoord) -> GlobalCoord {
         GlobalCoord::new(
-            self.x * G_CHUNK_SIZE + block.x as GlobalUnit,
-            self.y * G_CHUNK_SIZE + block.y as GlobalUnit,
-            self.z * G_CHUNK_SIZE + block.z as GlobalUnit,
+            self.x.add(block.x as GlobalUnit),
+            self.y.add(block.y as GlobalUnit),
+            self.z.add(block.z as GlobalUnit),
         )
     }
 }
@@ -76,16 +106,16 @@ pub struct BlockCoord {
 
 impl BlockCoord {
     pub fn flatten(&self) -> usize {
-        self.z as usize * CHUNK_SQUARE + self.y as usize * CHUNK_SIZE + self.x as usize
+        (self.z as usize).mul(CHUNK_SQUARE) + (self.y as usize).mul(CHUNK_SIZE) + self.x as usize
     }
 }
 
 impl From<usize> for BlockCoord {
     fn from(idx: usize) -> Self {
         Self {
-            x: (idx / (CHUNK_SQUARE)) as LocalUnit,
-            y: (idx % (CHUNK_SQUARE) / CHUNK_SIZE) as LocalUnit,
-            z: (idx % CHUNK_SIZE) as LocalUnit,
+            x: idx.div_euclid(CHUNK_SQUARE) as LocalUnit,
+            y: idx.rem_euclid(CHUNK_SQUARE).div_euclid(CHUNK_SIZE) as LocalUnit,
+            z: idx.rem_euclid(CHUNK_SIZE) as LocalUnit,
         }
     }
 }
@@ -93,9 +123,9 @@ impl From<usize> for BlockCoord {
 impl From<GlobalUnit> for BlockCoord {
     fn from(idx: GlobalUnit) -> Self {
         Self {
-            x: (idx / (G_CHUNK_SQUARE)) as LocalUnit,
-            y: (idx % (G_CHUNK_SQUARE) / G_CHUNK_SIZE) as LocalUnit,
-            z: (idx % G_CHUNK_SIZE) as LocalUnit,
+            x: idx.div_euclid(G_CHUNK_SQUARE) as LocalUnit,
+            y: idx.rem_euclid(G_CHUNK_SQUARE).div_euclid(G_CHUNK_SIZE) as LocalUnit,
+            z: idx.rem_euclid(G_CHUNK_SIZE) as LocalUnit,
         }
     }
 }
@@ -111,19 +141,27 @@ pub struct GlobalCoord {
 }
 
 impl GlobalCoord {
+    pub fn to_chunk_id(&self) -> ChunkId {
+        ChunkId::new(
+            self.x.div_euclid(G_CHUNK_SIZE),
+            self.y.div_euclid(G_CHUNK_SIZE),
+            self.z.div_euclid(G_CHUNK_SIZE),
+        )
+    }
+
     pub fn to_chunk(&self) -> ChunkCoord {
         ChunkCoord::new(
-            self.x / G_CHUNK_SIZE,
-            self.y / G_CHUNK_SIZE,
-            self.z / G_CHUNK_SIZE,
+            self.x.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+            self.y.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+            self.z.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
         )
     }
 
     pub fn to_block(&self) -> BlockCoord {
         BlockCoord::new(
-            self.x as LocalUnit % L_CHUNK_SIZE,
-            self.y as LocalUnit % L_CHUNK_SIZE,
-            self.z as LocalUnit % L_CHUNK_SIZE,
+            (self.x as LocalUnit).rem_euclid(L_CHUNK_SIZE),
+            (self.y as LocalUnit).rem_euclid(L_CHUNK_SIZE),
+            (self.z as LocalUnit).rem_euclid(L_CHUNK_SIZE),
         )
     }
 }
@@ -132,8 +170,7 @@ impl GlobalCoord {
 #[cfg(test)]
 mod tests {
     //! All tests written assuming that chunk size is 16 blocks
-
-    use super::{BlockCoord, ChunkCoord, GlobalCoord};
+    use super::{BlockCoord, ChunkCoord, ChunkId, GlobalCoord};
 
     #[test]
     fn block_from_usize() {
@@ -144,16 +181,30 @@ mod tests {
     }
 
     #[test]
+    fn global_to_chunk_id() {
+        assert_eq!(GlobalCoord::ZERO.to_chunk_id(), ChunkId::ZERO);
+        assert_eq!(GlobalCoord::new(15, 15, 15).to_chunk_id(), ChunkId::ZERO);
+        assert_eq!(
+            GlobalCoord::new(31, 31, 31).to_chunk_id(),
+            ChunkId::new(1, 1, 1)
+        );
+        assert_eq!(
+            GlobalCoord::new(127, 31, 256).to_chunk_id(),
+            ChunkId::new(7, 1, 16)
+        );
+    }
+
+    #[test]
     fn global_to_chunk() {
         assert_eq!(GlobalCoord::ZERO.to_chunk(), ChunkCoord::ZERO);
         assert_eq!(GlobalCoord::new(15, 15, 15).to_chunk(), ChunkCoord::ZERO);
         assert_eq!(
             GlobalCoord::new(31, 31, 31).to_chunk(),
-            ChunkCoord::new(1, 1, 1)
+            ChunkCoord::new(16, 16, 16)
         );
         assert_eq!(
             GlobalCoord::new(127, 31, 256).to_chunk(),
-            ChunkCoord::new(7, 1, 16)
+            ChunkCoord::new(112, 16, 256)
         );
     }
 
