@@ -26,12 +26,15 @@ impl ChunkManager {
             .for_each(|(coord, chunk)| {
                 // TODO: Add a check for an empty mesh when it'll be aware of neighboring blocks
                 // Check if chunk has at least one opaque block. Otherwise skip mesh building
-                if let Some(_) = chunk.blocks.iter().filter(|block| block.opaque()).next() {
+                if chunk.blocks.iter().any(|block| block.opaque()) {
                     let mesh = TerrainMesh::build(coord.to_coord(), &chunk.blocks);
                     tracing::debug!(?coord, "Building mesh for chunk");
 
                     self.terrain.insert(*coord, TerrainChunk::new(device, mesh));
+                } else {
+                    self.terrain.remove(coord);
                 }
+
                 chunk.dirty = false;
             });
     }
