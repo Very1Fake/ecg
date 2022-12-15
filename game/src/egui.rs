@@ -421,9 +421,8 @@ impl DebugOverlayState {
                                     .logic
                                     .get_mut(&self.painter.chunk_id)
                                 {
-                                    *chunk.blocks_box() =
-                                        vec![Block::from(self.painter.block); CHUNK_CUBE]
-                                            .into_boxed_slice();
+                                    *chunk.blocks_mut() =
+                                        [Block::from(self.painter.block); CHUNK_CUBE];
                                 }
                             }
                         });

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use common::{
     block::Block,
-    coord::{ChunkId, CHUNK_SQUARE, G_CHUNK_SIZE},
+    coord::{ChunkId, CHUNK_SQUARE},
     span,
 };
 use wgpu::BufferUsages;
@@ -91,27 +91,18 @@ impl Scene {
         let voxel_instance_buffer = DynamicBuffer::new(&renderer.device, 1, BufferUsages::VERTEX);
         voxel_instance_buffer.update(&renderer.queue, &[voxel_instance.as_raw()], 0);
 
-        let mut chunk_manager = ChunkManager::default();
+        let mut chunk_manager = ChunkManager::new();
 
-        (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|x| {
-            (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|y| {
-                (-G_CHUNK_SIZE..=G_CHUNK_SIZE).for_each(|z| {
-                    chunk_manager
-                        .logic
-                        .insert(ChunkId::new(x, y, z), LogicChunk::new());
-                });
-            });
+        chunk_manager.logic.insert(ChunkId::ZERO, {
+            let mut chunk = LogicChunk::new();
+            chunk
+                .blocks_mut()
+                .iter_mut()
+                .skip(CHUNK_SQUARE * 8)
+                .zip(Block::ALL.iter())
+                .for_each(|(block, block_type)| *block = *block_type);
+            chunk
         });
-
-        chunk_manager
-            .logic
-            .get_mut(&ChunkId::ZERO)
-            .unwrap()
-            .blocks_mut()
-            .iter_mut()
-            .skip(CHUNK_SQUARE * 8)
-            .zip(Block::ALL.iter())
-            .for_each(|(block, block_type)| *block = *block_type);
 
         Self {
             model,
@@ -204,7 +195,8 @@ impl Scene {
             &[Globals::new(self.camera.proj_mat(), self.camera.view_mat())],
         );
 
-        self.chunk_manager.maintain(&game.window.renderer().device);
+        self.chunk_manager
+            .maintain(&game.window.renderer().device, &self.camera);
 
         // Update voxel position
         if matches!(self.camera.mode, CameraMode::ThirdPerson) {

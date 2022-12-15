@@ -1,5 +1,5 @@
 use std::{
-    f32::consts::{FRAC_PI_2, FRAC_PI_6, TAU},
+    f32::consts::{FRAC_PI_2, FRAC_PI_4, TAU},
     time::Duration,
 };
 
@@ -63,7 +63,8 @@ impl Camera {
 
     // Limits
     pub const MIN_DISTANCE: f32 = 0.1;
-    pub const MIN_FOV: f32 = FRAC_PI_6;
+    pub const MIN_THIRD_PERSON_DISTANCE: f32 = 2.5;
+    pub const MIN_FOV: f32 = FRAC_PI_4;
     pub const MAX_FOV: f32 = 2.356194;
     pub const MIN_Z_NEAR: f32 = 0.01; // FIX
     pub const MAX_Z_NEAR: f32 = 16.0;
@@ -74,7 +75,7 @@ impl Camera {
     pub const DEFAULT_POSITION: F32x3 = F32x3::new(5.0, 0.5, 0.0);
     pub const DEFAULT_ORIENTATION: F32x2 = F32x2::new(-FRAC_PI_2, 0.08333);
     pub const DEFAULT_DISTANCE: f32 = 2.5;
-    pub const DEFAULT_FOV: f32 = 45.0;
+    pub const DEFAULT_FOV: f32 = 90.0;
     pub const Z_NEAR: f32 = 0.1;
     pub const Z_FAR: f32 = 100.0;
 
@@ -135,7 +136,10 @@ impl Camera {
         if delta > 0.0 || !matches!(self.mode, CameraMode::FirstPerson { .. }) {
             let f_dist = self.dist + delta;
             match self.mode {
-                CameraMode::FirstPerson { .. } => self.set_mode(CameraMode::ThirdPerson),
+                CameraMode::FirstPerson { .. } => {
+                    self.set_mode(CameraMode::ThirdPerson);
+                    self.f_dist = Self::MIN_THIRD_PERSON_DISTANCE;
+                }
                 CameraMode::ThirdPerson { .. } => {
                     if f_dist < Self::SWITCH_DISTANCE {
                         self.set_mode(CameraMode::FirstPerson)
@@ -236,7 +240,7 @@ pub struct CameraController {
 }
 
 impl CameraController {
-    const SPEED: f32 = 2.0;
+    const SPEED: f32 = 25.0;
 
     /// Resets camera controller inputs
     pub fn reset(&mut self) {

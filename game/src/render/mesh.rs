@@ -37,7 +37,7 @@ impl TerrainMesh {
                             .corners()
                             .into_iter()
                             .map(|position| Vertex {
-                                position: position * 0.1,
+                                position: position,
                                 color: block.color(),
                             })
                     })

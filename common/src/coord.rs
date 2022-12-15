@@ -1,4 +1,4 @@
-use std::ops::{Add, Mul};
+use std::ops::{Add, Mul, Sub};
 
 use glam::Vec3;
 
@@ -27,6 +27,14 @@ macro_rules! coord_base_impl {
 
                 pub const fn new(x: $repr, y: $repr, z: $repr) -> Self {
                     Self { x, y, z }
+                }
+
+                pub fn from_vec3(vec: Vec3) -> Self {
+                    Self {
+                        x: vec.x as $repr,
+                        y: vec.y as $repr,
+                        z: vec.z as $repr,
+                    }
                 }
 
                 pub fn as_vec(&self) -> Vec3 {
@@ -63,6 +71,18 @@ impl ChunkId {
             self.y * G_CHUNK_SIZE,
             self.z * G_CHUNK_SIZE,
         )
+    }
+}
+
+impl Sub<GlobalUnit> for ChunkId {
+    type Output = ChunkId;
+
+    fn sub(self, rhs: GlobalUnit) -> Self::Output {
+        Self {
+            x: self.x.sub(rhs),
+            y: self.y.sub(rhs),
+            z: self.z.sub(rhs),
+        }
     }
 }
 
@@ -165,6 +185,7 @@ impl GlobalCoord {
         )
     }
 }
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]

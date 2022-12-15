@@ -28,7 +28,7 @@ impl Voxel {
                     .into_iter()
                     .map(|position| Vertex {
                         // Rescale
-                        position: position * 0.1,
+                        position: position,
                         color: F32x3::ZERO,
                     })
             })

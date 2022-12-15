@@ -26,13 +26,13 @@ impl Vertex {
         // Top point of pyramid
         Self::new(F32x3::new(0.0, 0.0, 0.0), F32x3::new(1.0, 1.0, 1.0)),
         // Left near point of pyramid 
-        Self::new(F32x3::new(-0.5, -0.5, -0.5), F32x3::new(0.0, 1.0, 0.0)),
+        Self::new(F32x3::new(-5.0, -5.0, -5.0), F32x3::new(0.0, 1.0, 0.0)),
         // Left far point of pyramid 
-        Self::new(F32x3::new(-0.5, -0.5, 0.5), F32x3::new(0.0, 0.0, 1.0)),
+        Self::new(F32x3::new(-5.0, -5.0, 5.0), F32x3::new(0.0, 0.0, 1.0)),
         // Right near point of pyramid 
-        Self::new(F32x3::new(0.5, -0.5, -0.5), F32x3::new(1.0, 1.0, 0.0)),
+        Self::new(F32x3::new(5.0, -5.0, -5.0), F32x3::new(1.0, 1.0, 0.0)),
         // Right far point of pyramid
-        Self::new(F32x3::new(0.5, -0.5, 0.5), F32x3::new(1.0, 0.0, 0.0)),
+        Self::new(F32x3::new(5.0, -5.0, 5.0), F32x3::new(1.0, 0.0, 0.0)),
     ];
 
     #[rustfmt::skip]
