@@ -19,6 +19,7 @@ use crate::{
     render::{renderer::Renderer, RenderMode},
     scene::{
         camera::{Camera, CameraMode},
+        chunk::ChunkManager,
         Scene,
     },
     types::WEvent,
@@ -112,6 +113,8 @@ pub struct DebugOverlayState {
     gpu_timing_opened: bool,
     /// Camera tweaks window
     camera_opened: bool,
+    /// Chunk tweaks window
+    chunks_opened: bool,
     /// Block changer
     painter_opened: bool,
 
@@ -127,6 +130,7 @@ impl DebugOverlayState {
             graphics_opened: false,
             gpu_timing_opened: false,
             camera_opened: false,
+            chunks_opened: false,
             painter_opened: false,
             graphics_tweaks: GraphicsTweaks::new(),
             painter: Painter::new(),
@@ -137,7 +141,13 @@ impl DebugOverlayState {
     pub fn draw(&mut self, ctx: &Context, payload: DebugPayload) {
         let DebugPayload {
             clock_stats,
-            scene: Scene { camera, fps, .. },
+            scene:
+                Scene {
+                    camera,
+                    chunk_manager,
+                    fps,
+                    ..
+                },
             renderer,
         } = payload;
 
@@ -158,7 +168,10 @@ impl DebugOverlayState {
                         if menu.button("Camera").clicked() {
                             self.camera_opened = true;
                         }
-                        if menu.button("Reset").clicked() {
+                        if menu.button("Chunks").clicked() {
+                            self.chunks_opened = true;
+                        }
+                        if menu.button("Reset Camera").clicked() {
                             camera.f_pos = Camera::DEFAULT_POSITION;
                             camera.f_rot = Camera::DEFAULT_ORIENTATION;
                             camera.set_mode(CameraMode::FirstPerson);
@@ -356,6 +369,29 @@ impl DebugOverlayState {
                 });
             });
 
+        Window::new("Chunks")
+            .open(&mut self.chunks_opened)
+            .resizable(false)
+            .show(ctx, |ui| {
+                Grid::new("chunks_tweaks")
+                    .num_columns(2)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        ui.label("Draw distance");
+                        ui.add(Slider::new(
+                            &mut chunk_manager.draw_distance,
+                            ChunkManager::MIN_DRAW_DISTANCE..=ChunkManager::MAX_DRAW_DISTANCE,
+                        ));
+                        ui.end_row();
+
+                        ui.label("");
+                        if ui.button("Clear Mesh").clicked() {
+                            chunk_manager.clear_mesh();
+                        }
+                        ui.end_row();
+                    });
+            });
+
         Window::new("Painter")
             .open(&mut self.painter_opened)
             .resizable(false)
@@ -374,9 +410,7 @@ impl DebugOverlayState {
                             ui.label("Block Changer");
 
                             if ui.button("Set").clicked() {
-                                if let Some(chunk) = payload
-                                    .scene
-                                    .chunk_manager
+                                if let Some(chunk) = chunk_manager
                                     .logic
                                     .get_mut(&self.painter.block_pos.to_chunk_id())
                                 {
@@ -415,11 +449,8 @@ impl DebugOverlayState {
                         ui.horizontal(|ui| {
                             ui.label("Chunk Filler");
                             if ui.button("Fill").clicked() {
-                                if let Some(chunk) = payload
-                                    .scene
-                                    .chunk_manager
-                                    .logic
-                                    .get_mut(&self.painter.chunk_id)
+                                if let Some(chunk) =
+                                    chunk_manager.logic.get_mut(&self.painter.chunk_id)
                                 {
                                     *chunk.blocks_mut() =
                                         [Block::from(self.painter.block); CHUNK_CUBE];
