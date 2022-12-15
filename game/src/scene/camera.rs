@@ -66,10 +66,10 @@ impl Camera {
     pub const MIN_THIRD_PERSON_DISTANCE: f32 = 2.5;
     pub const MIN_FOV: f32 = FRAC_PI_4;
     pub const MAX_FOV: f32 = 2.356194;
-    pub const MIN_Z_NEAR: f32 = 0.01; // FIX
+    pub const MIN_Z_NEAR: f32 = 0.01;
     pub const MAX_Z_NEAR: f32 = 16.0;
     pub const MIN_Z_FAR: f32 = 32.0;
-    pub const MAX_Z_FAR: f32 = 512.0; // FIX
+    pub const MAX_Z_FAR: f32 = 16384.0;
 
     // Defaults
     pub const DEFAULT_POSITION: F32x3 = F32x3::new(5.0, 0.5, 0.0);
@@ -77,7 +77,7 @@ impl Camera {
     pub const DEFAULT_DISTANCE: f32 = 2.5;
     pub const DEFAULT_FOV: f32 = 90.0;
     pub const Z_NEAR: f32 = 0.1;
-    pub const Z_FAR: f32 = 100.0;
+    pub const Z_FAR: f32 = 512.0;
 
     // TODO: Split camera and player logic
     pub fn new(aspect: f32, mode: CameraMode) -> Self {

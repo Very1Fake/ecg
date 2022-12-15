@@ -77,6 +77,7 @@ impl ChunkManager {
     }
 
     pub fn cleanup(&mut self) {
+        // BUG: No freeing
         self.logic.shrink_to_fit();
         self.terrain.shrink_to_fit();
     }
@@ -84,6 +85,12 @@ impl ChunkManager {
     pub fn clear_mesh(&mut self) {
         self.logic.values_mut().for_each(|chunk| chunk.dirty = true);
         self.terrain.clear();
+    }
+}
+
+impl Default for ChunkManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

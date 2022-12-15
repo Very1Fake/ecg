@@ -168,7 +168,7 @@ impl DebugOverlayState {
                         if menu.button("Camera").clicked() {
                             self.camera_opened = true;
                         }
-                        if menu.button("Chunks").clicked() {
+                        if menu.button("ChunkManager").clicked() {
                             self.chunks_opened = true;
                         }
                         if menu.button("Reset Camera").clicked() {
@@ -369,27 +369,56 @@ impl DebugOverlayState {
                 });
             });
 
-        Window::new("Chunks")
+        Window::new("ChunkManager")
             .open(&mut self.chunks_opened)
             .resizable(false)
             .show(ctx, |ui| {
-                Grid::new("chunks_tweaks")
-                    .num_columns(2)
-                    .striped(true)
-                    .show(ui, |ui| {
-                        ui.label("Draw distance");
-                        ui.add(Slider::new(
-                            &mut chunk_manager.draw_distance,
-                            ChunkManager::MIN_DRAW_DISTANCE..=ChunkManager::MAX_DRAW_DISTANCE,
-                        ));
-                        ui.end_row();
+                ui.collapsing("Tweaks", |ui| {
+                    Grid::new("chunks_tweaks")
+                        .num_columns(2)
+                        .striped(true)
+                        .show(ui, |ui| {
+                            ui.label("Draw distance");
+                            ui.add(
+                                DragValue::new(&mut chunk_manager.draw_distance)
+                                    .fixed_decimals(0)
+                                    .speed(1.0)
+                                    .clamp_range(
+                                        ChunkManager::MIN_DRAW_DISTANCE
+                                            ..=ChunkManager::MAX_DRAW_DISTANCE,
+                                    ),
+                            );
+                            ui.end_row();
 
-                        ui.label("");
-                        if ui.button("Clear Mesh").clicked() {
-                            chunk_manager.clear_mesh();
-                        }
-                        ui.end_row();
-                    });
+                            if ui.button("Clear Mesh").clicked() {
+                                chunk_manager.clear_mesh();
+                            }
+                            ui.end_row();
+
+                            if ui.button("Cleanup").clicked() {
+                                // TODO: Make GC tick
+                                chunk_manager.cleanup();
+                            }
+                            ui.end_row();
+                        });
+                });
+
+                ui.collapsing("Stats", |ui| {
+                    Grid::new("chunk_manger_stats_grid")
+                        .num_columns(2)
+                        .striped(true)
+                        .show(ui, |ui| {
+                            let ChunkManager { logic, terrain, .. } = chunk_manager;
+
+                            ui.label("Logic Chunks:");
+                            ui.label(format!("{} ({})", logic.len(), logic.capacity()));
+                            ui.end_row();
+
+                            ui.label("Terrain Chunks:");
+                            ui.label(format!("{} ({})", terrain.len(), terrain.capacity()));
+                            ui.end_row();
+                        });
+                });
             });
 
         Window::new("Painter")
@@ -480,12 +509,10 @@ impl DebugOverlayState {
                     });
                 });
 
-                // ui.vertical_centered(|ui| {
                 // TODO: Add button to set position to camera
                 if ui.button("Reset").clicked() {
                     self.painter = Painter::new();
                 }
-                // });
             });
     }
 }
