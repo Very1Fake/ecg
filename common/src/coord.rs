@@ -2,6 +2,8 @@ use std::ops::{Add, Mul, Sub};
 
 use glam::Vec3;
 
+use crate::direction::Direction;
+
 pub type GlobalUnit = i64;
 pub type LocalUnit = u8;
 
@@ -39,6 +41,21 @@ macro_rules! coord_base_impl {
 
                 pub fn as_vec(&self) -> Vec3 {
                     Vec3::new(self.x as f32, self.y as f32, self.z as f32)
+                }
+
+                pub const fn neighbor(&self, dir: Direction) -> Self {
+                    let mut new = *self;
+
+                    match dir {
+                        Direction::Up => new.y += 1,
+                        Direction::Down => new.y -= 1,
+                        Direction::Left => new.x -= 1,
+                        Direction::Right => new.x += 1,
+                        Direction::Front => new.z -= 1,
+                        Direction::Back => new.z += 1,
+                    }
+
+                    new
                 }
             }
 
@@ -125,6 +142,17 @@ pub struct BlockCoord {
 }
 
 impl BlockCoord {
+    pub fn at_edge(&self, dir: Direction) -> bool {
+        match dir {
+            Direction::Up => self.y == L_CHUNK_SIZE - 1,
+            Direction::Down => self.y == 0,
+            Direction::Left => self.x == 0,
+            Direction::Right => self.x == L_CHUNK_SIZE - 1,
+            Direction::Front => self.z == 0,
+            Direction::Back => self.z == L_CHUNK_SIZE - 1,
+        }
+    }
+
     pub fn flatten(&self) -> usize {
         (self.z as usize).mul(CHUNK_SQUARE) + (self.y as usize).mul(CHUNK_SIZE) + self.x as usize
     }

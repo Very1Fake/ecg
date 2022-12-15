@@ -1,4 +1,5 @@
 use bytemuck::cast_slice;
+use common::direction::Direction;
 use wgpu::{
     util::{BufferInitDescriptor, DeviceExt},
     Buffer, BufferUsages, Device, IndexFormat,
@@ -7,7 +8,7 @@ use wgpu::{
 use crate::{
     render::{
         model::Model,
-        primitives::{direction::Direction, quad::Quad, vertex::Vertex},
+        primitives::{quad::Quad, vertex::Vertex},
     },
     types::F32x3,
 };
@@ -28,7 +29,7 @@ impl Voxel {
                     .into_iter()
                     .map(|position| Vertex {
                         // Rescale
-                        position: position,
+                        position,
                         color: F32x3::ZERO,
                     })
             })

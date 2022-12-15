@@ -1,6 +1,6 @@
-use crate::types::F32x3;
+use common::direction::Direction;
 
-use super::direction::Direction;
+use crate::types::F32x3;
 
 pub const HALF_SIZE: f32 = 0.5;
 

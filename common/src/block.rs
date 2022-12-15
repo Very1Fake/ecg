@@ -5,10 +5,8 @@ pub type BlockRepr = u8;
 /// Represents block ID
 #[derive(PartialEq, Eq, Clone, Copy, Default, Debug)]
 pub enum Block {
-    Void = 0,
-
     #[default]
-    Air,
+    Air = 0,
 
     // Basic
     Stone,
@@ -38,11 +36,10 @@ pub enum Block {
 }
 
 impl Block {
-    pub const MIN: BlockRepr = Self::Void as BlockRepr;
+    pub const MIN: BlockRepr = Self::Air as BlockRepr;
     pub const MAX: BlockRepr = Self::Ice as BlockRepr;
 
-    pub const ALL: [Self; 18] = [
-        Self::Void,
+    pub const ALL: [Self; 17] = [
         Self::Air,
         Self::Stone,
         Self::Dirt,
@@ -68,7 +65,7 @@ impl Block {
 
     #[inline]
     pub fn opaque(&self) -> bool {
-        !matches!(self, Self::Air | Self::Void)
+        !matches!(self, Self::Air)
     }
 
     #[inline]
@@ -86,7 +83,6 @@ impl Block {
 
     pub fn color(&self) -> Vec3 {
         match self {
-            Self::Void => Vec3::new(0.0, 0.0, 0.0),
             Self::Air => Vec3::new(1.0, 1.0, 1.0),
             Self::Stone => Vec3::new(0.525, 0.53, 0.52),
             Self::Dirt => Vec3::new(0.28, 0.16, 0.047),
@@ -111,25 +107,24 @@ impl Block {
 impl From<BlockRepr> for Block {
     fn from(id: BlockRepr) -> Self {
         match id {
-            0 => Self::Void,
-            1 => Self::Air,
-            2 => Self::Stone,
-            3 => Self::Dirt,
-            4 => Self::Grass,
-            5 => Self::Leaves,
-            6 => Self::Water,
-            7 => Self::MovingWater,
-            8 => Self::Magma,
-            9 => Self::MovingMagma,
-            10 => Self::Lava,
-            11 => Self::MovingLava,
-            12 => Self::SandStone,
-            13 => Self::Sand,
-            14 => Self::Clay,
-            15 => Self::Mud,
-            16 => Self::SnowBlock,
-            17 => Self::Ice,
-            _ => Self::Void,
+            0 => Self::Air,
+            1 => Self::Stone,
+            2 => Self::Dirt,
+            3 => Self::Grass,
+            4 => Self::Leaves,
+            5 => Self::Water,
+            6 => Self::MovingWater,
+            7 => Self::Magma,
+            8 => Self::MovingMagma,
+            9 => Self::Lava,
+            10 => Self::MovingLava,
+            11 => Self::SandStone,
+            12 => Self::Sand,
+            13 => Self::Clay,
+            14 => Self::Mud,
+            15 => Self::SnowBlock,
+            16 => Self::Ice,
+            _ => Self::Air,
         }
     }
 }

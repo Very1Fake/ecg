@@ -3,5 +3,6 @@ pub mod clock;
 pub mod macros;
 pub mod block;
 pub mod coord;
+pub mod direction;
 
 pub use macros::*;

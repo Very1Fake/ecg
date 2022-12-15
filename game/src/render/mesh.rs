@@ -1,10 +1,11 @@
 use common::{
     block::Block,
     coord::{BlockCoord, ChunkCoord},
+    direction::Direction,
     prof,
 };
 
-use crate::render::primitives::{direction::Direction, quad::Quad};
+use crate::render::primitives::quad::Quad;
 
 use super::primitives::vertex::Vertex;
 
@@ -25,7 +26,21 @@ impl TerrainMesh {
         blocks
             .iter()
             .enumerate()
-            .filter(|(_, &block)| block.opaque())
+            .filter(|(id, &block)| {
+                if block.opaque() {
+                    let pos = BlockCoord::from(*id);
+
+                    !Direction::ALL.iter().all(|&dir| {
+                        if pos.at_edge(dir) {
+                            false
+                        } else {
+                            blocks[pos.neighbor(dir).flatten()].opaque()
+                        }
+                    })
+                } else {
+                    false
+                }
+            })
             .for_each(|(flat_coord, block)| {
                 let pos = coord
                     .to_global(&BlockCoord::from(flat_coord as i64))
@@ -37,7 +52,7 @@ impl TerrainMesh {
                             .corners()
                             .into_iter()
                             .map(|position| Vertex {
-                                position: position,
+                                position,
                                 color: block.color(),
                             })
                     })
