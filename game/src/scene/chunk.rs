@@ -1,24 +1,23 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::mpsc::{channel, Receiver, Sender},
 };
 
 use common::{
     block::Block,
     coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE},
-    span,
+    prof, span,
 };
 use tokio::runtime::Runtime;
 use wgpu::{BufferUsages, Device};
 
 use crate::{
-    consts::BLOCKING_THREADS,
+    consts::{BLOCKING_THREADS, CPU_CORES},
     render::{
         buffer::Buffer,
         mesh::{MeshTaskResult, TerrainMesh},
         primitives::vertex::Vertex,
     },
-    types::F32x3,
 };
 
 use super::camera::Camera;
@@ -30,25 +29,32 @@ pub struct ChunkManager {
     pub mesh_builder_rx: Receiver<MeshTaskResult>,
     pub mesh_builder_tx: Sender<MeshTaskResult>,
 
+    pub chunk_gen_rx: Receiver<(ChunkId, LogicChunk)>,
+    pub chunk_gen_tx: Sender<(ChunkId, LogicChunk)>,
+    pub chunk_gen_ids: HashSet<ChunkId>,
+
     pub logic: HashMap<ChunkId, LogicChunk>,
     pub terrain: HashMap<ChunkId, TerrainChunk>,
 }
 
 impl ChunkManager {
     // Limits
-    pub const MAX_LOADS_PER_FRAME: usize = 2;
-    pub const MAX_UNLOADS_PER_FRAME: usize = 4;
     pub const MIN_DRAW_DISTANCE: u16 = 2;
     pub const MAX_DRAW_DISTANCE: u16 = 256;
 
     pub fn new() -> Self {
         let (mesh_builder_tx, mesh_builder_rx) = channel();
+        let (chunk_gen_tx, chunk_gen_rx) = channel();
 
         Self {
             draw_distance: Self::MIN_DRAW_DISTANCE,
 
             mesh_builder_rx,
             mesh_builder_tx,
+
+            chunk_gen_rx,
+            chunk_gen_tx,
+            chunk_gen_ids: HashSet::with_capacity(*CPU_CORES),
 
             logic: HashMap::new(),
             terrain: HashMap::new(),
@@ -74,6 +80,12 @@ impl ChunkManager {
             }
         });
 
+        // Collect generated logic chunks
+        self.chunk_gen_rx.try_iter().for_each(|(id, chunk)| {
+            self.chunk_gen_ids.remove(&id);
+            self.logic.insert(id, chunk);
+        });
+
         // Run mesh generating tasks
         self.logic
             .iter_mut()
@@ -96,26 +108,31 @@ impl ChunkManager {
                 }
             });
 
-        self.load_chunks(camera.pos);
-    }
-
-    pub fn load_chunks(&mut self, player_pos: F32x3) {
+        // Load new chunks
         LoadArea::new(
-            // FIX
-            GlobalCoord::from_vec3(player_pos).to_chunk_id(),
+            GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
             self.draw_distance as i64,
         )
-        .filter(|coord| !self.logic.contains_key(coord))
-        .take(Self::MAX_LOADS_PER_FRAME)
+        .filter(|id| {
+            !self.logic.contains_key(id)
+                && !self.chunk_gen_ids.contains(id)
+                && self.chunk_gen_ids.len() < *CPU_CORES
+        })
+        .take(*CPU_CORES - self.chunk_gen_ids.len())
         .collect::<Vec<_>>()
         .iter()
-        .for_each(|coord| {
-            self.logic.insert(*coord, generate_chunk(*coord));
+        .for_each(|id| {
+            let id = *id;
+            self.chunk_gen_ids.insert(id);
+
+            let tx = self.chunk_gen_tx.clone();
+            runtime.spawn_blocking(move || {
+                let _ = tx.send((id, LogicChunk::generate_flat(id)));
+            });
         });
     }
 
     pub fn cleanup(&mut self) {
-        // BUG: No freeing
         self.logic.shrink_to_fit();
         self.terrain.shrink_to_fit();
     }
@@ -172,6 +189,27 @@ impl LogicChunk {
     pub fn blocks_mut(&mut self) -> &mut [Block; CHUNK_CUBE] {
         self.status = TerrainStatus::None;
         &mut self.blocks
+    }
+
+    fn generate_flat(id: ChunkId) -> LogicChunk {
+        prof!("LogicChunk::generate_flat");
+
+        let coord = id.to_coord();
+        let mut blocks = [Block::Air; CHUNK_CUBE];
+
+        blocks.iter_mut().enumerate().for_each(|(i, block)| {
+            let pos = coord.to_global(&BlockCoord::from(i));
+
+            match pos.y {
+                0 => *block = Block::Grass,
+                -10..=-1 => *block = Block::Dirt,
+                -128..=-11 => *block = Block::Stone,
+                GlobalUnit::MIN..=-129 => *block = Block::Stone,
+                _ => {}
+            };
+        });
+
+        LogicChunk::from_blocks(blocks)
     }
 }
 
@@ -248,25 +286,6 @@ impl Iterator for LoadArea {
         self.current = new;
         Some(item)
     }
-}
-
-fn generate_chunk(c_id: ChunkId) -> LogicChunk {
-    let mut chunk = LogicChunk::new();
-    let coord = c_id.to_coord();
-
-    chunk.blocks.iter_mut().enumerate().for_each(|(i, block)| {
-        let pos = coord.to_global(&BlockCoord::from(i));
-
-        *block = match pos.y {
-            0 => Block::Grass,
-            -10..=-1 => Block::Dirt,
-            -128..=-11 => Block::Stone,
-            GlobalUnit::MIN..=-129 => Block::Stone,
-            _ => Block::Air,
-        };
-    });
-
-    chunk
 }
 
 #[cfg(test)]
