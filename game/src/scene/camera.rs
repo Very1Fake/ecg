@@ -133,8 +133,11 @@ impl Camera {
 
     /// Handle zoom
     pub fn zoom(&mut self, delta: f32) {
+        // TODO: Add zoom sensitivity to game settings
+        const SENSITIVITY: f32 = 2.5;
+
         if delta > 0.0 || !matches!(self.mode, CameraMode::FirstPerson { .. }) {
-            let f_dist = self.dist + delta;
+            let f_dist = self.dist + delta * SENSITIVITY;
             match self.mode {
                 CameraMode::FirstPerson { .. } => {
                     self.set_mode(CameraMode::ThirdPerson);

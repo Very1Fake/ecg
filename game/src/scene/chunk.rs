@@ -54,7 +54,7 @@ impl ChunkManager {
 
             chunk_gen_rx,
             chunk_gen_tx,
-            chunk_gen_ids: HashSet::with_capacity(*CPU_CORES),
+            chunk_gen_ids: HashSet::with_capacity(*BLOCKING_THREADS * 4),
 
             logic: HashMap::new(),
             terrain: HashMap::new(),
@@ -90,7 +90,7 @@ impl ChunkManager {
         self.logic
             .iter_mut()
             .filter(|(_, chunk)| matches!(chunk.status, TerrainStatus::None))
-            .take(*BLOCKING_THREADS * 4)
+            .take(*BLOCKING_THREADS * 8)
             .for_each(|(coord, chunk)| {
                 // TODO: Add a check for an empty mesh when it'll be aware of neighboring blocks
                 // Check if chunk has at least one opaque block. Otherwise skip mesh building
@@ -118,7 +118,7 @@ impl ChunkManager {
                 && !self.chunk_gen_ids.contains(id)
                 && self.chunk_gen_ids.len() < *CPU_CORES
         })
-        .take(*CPU_CORES - self.chunk_gen_ids.len())
+        .take(*BLOCKING_THREADS * 4 - self.chunk_gen_ids.len())
         .collect::<Vec<_>>()
         .iter()
         .for_each(|id| {
@@ -244,8 +244,8 @@ pub struct LoadArea {
 
 impl LoadArea {
     pub fn new(center: ChunkId, radius: GlobalUnit) -> Self {
-        let start = ChunkId::new(center.x - radius, center.y - radius, center.z - radius);
-        let end = ChunkId::new(center.x + radius, center.y + radius, center.z + radius);
+        let start = ChunkId::new(center.x - radius, center.y - radius / 2, center.z - radius);
+        let end = ChunkId::new(center.x + radius, center.y + radius / 2, center.z + radius);
 
         Self {
             start,
