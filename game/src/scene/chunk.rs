@@ -12,6 +12,7 @@ use tokio::runtime::Runtime;
 use wgpu::{BufferUsages, Device};
 
 use crate::{
+    consts::BLOCKING_THREADS,
     render::{
         buffer::Buffer,
         mesh::{MeshTaskResult, TerrainMesh},
@@ -58,20 +59,26 @@ impl ChunkManager {
     pub fn maintain(&mut self, device: &Device, runtime: &Runtime, camera: &Camera) {
         span!(_guard, "maintain", "ChunkManager::maintain");
 
-        // Collect generated meshes
-        self.mesh_builder_rx
-            .try_iter()
-            .take(4)
-            .for_each(|(coord, mesh)| {
-                // TODO: Check if terrain already rebuilt
-                self.terrain
-                    .insert(coord.to_id(), TerrainChunk::new(device, mesh));
-            });
+        // Collect generated terrain chunks
+        self.mesh_builder_rx.try_iter().for_each(|(coord, mesh)| {
+            let coord = coord.to_id();
+
+            // TODO: Check if terrain already rebuilt
+            if let Some(logic) = self.logic.get_mut(&coord) {
+                if matches!(logic.status, TerrainStatus::Pending) {
+                    self.terrain.insert(coord, TerrainChunk::new(device, mesh));
+                    logic.status = TerrainStatus::Built;
+                } else {
+                    tracing::warn!(?coord, "Chunk mesh building collision");
+                }
+            }
+        });
 
         // Run mesh generating tasks
         self.logic
             .iter_mut()
-            .filter(|(_, chunk)| chunk.is_dirty())
+            .filter(|(_, chunk)| matches!(chunk.status, TerrainStatus::None))
+            .take(*BLOCKING_THREADS * 4)
             .for_each(|(coord, chunk)| {
                 // TODO: Add a check for an empty mesh when it'll be aware of neighboring blocks
                 // Check if chunk has at least one opaque block. Otherwise skip mesh building
@@ -82,8 +89,11 @@ impl ChunkManager {
                     runtime.spawn_blocking(move || {
                         TerrainMesh::task(tx, coord.to_coord(), &blocks);
                     });
+
+                    chunk.status = TerrainStatus::Pending;
+                } else {
+                    chunk.status = TerrainStatus::Built;
                 }
-                chunk.dirty = false;
             });
 
         self.load_chunks(camera.pos);
@@ -111,7 +121,9 @@ impl ChunkManager {
     }
 
     pub fn clear_mesh(&mut self) {
-        self.logic.values_mut().for_each(|chunk| chunk.dirty = true);
+        self.logic
+            .values_mut()
+            .for_each(|chunk| chunk.status = TerrainStatus::None);
         self.terrain.clear();
     }
 }
@@ -122,26 +134,43 @@ impl Default for ChunkManager {
     }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone, Copy, Default)]
+pub enum TerrainStatus {
+    #[default]
+    None,
+    Pending,
+    Built,
+}
+
 /// Represents chunk state
 pub struct LogicChunk {
     blocks: [Block; CHUNK_CUBE],
-    dirty: bool,
+    status: TerrainStatus,
 }
 
 impl LogicChunk {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             blocks: [Block::Air; CHUNK_CUBE],
-            dirty: true,
+            status: TerrainStatus::None,
         }
     }
 
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
+    pub const fn from_blocks(blocks: [Block; CHUNK_CUBE]) -> Self {
+        Self {
+            blocks,
+            status: TerrainStatus::None,
+        }
+    }
+
+    pub fn status(&self) -> TerrainStatus {
+        self.status
     }
 
     pub fn blocks_mut(&mut self) -> &mut [Block; CHUNK_CUBE] {
-        self.dirty = true;
+        self.status = TerrainStatus::None;
         &mut self.blocks
     }
 }
@@ -166,6 +195,8 @@ impl TerrainChunk {
         }
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 pub struct LoadArea {
     start: ChunkId,

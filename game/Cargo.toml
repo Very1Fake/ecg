@@ -15,9 +15,11 @@ tracy-memory = ["tracy"]
 debug_overlay = ["egui", "egui_winit_platform", "egui_wgpu_backend"]
 
 [dependencies]
-glam.workspace = true
 bytemuck = { version = "1.12", features = ["derive"] }
 num_cpus = "1.14"
+lazy_static = "1.4"
+
+glam.workspace = true
 thiserror = "1.0"
 tokio = { version = "1.22", features = ["rt-multi-thread"] }
 tracing = "0.1"

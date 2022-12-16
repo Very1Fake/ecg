@@ -3,7 +3,14 @@
 use tokio::runtime::Builder;
 use tracing::{debug, info};
 
-use ecg_game::{bootstrap::bootstrap, error::Error, utils::VERSION, window::Window, Game};
+use ecg_game::{
+    bootstrap::bootstrap,
+    consts::{ASYNC_THREADS, BLOCKING_THREADS},
+    error::Error,
+    utils::VERSION,
+    window::Window,
+    Game,
+};
 
 #[cfg_attr(feature = "tracy-memory", global_allocator)]
 #[cfg(feature = "tracy-memory")]
@@ -21,10 +28,9 @@ fn main() -> Result<(), Error> {
 
     info!("Starting game instance. ECG v{VERSION}");
 
-    let cores = num_cpus::get();
     let runtime = Builder::new_multi_thread()
-        .worker_threads(2)
-        .max_blocking_threads((cores / 2).max(2))
+        .worker_threads(ASYNC_THREADS)
+        .max_blocking_threads(*BLOCKING_THREADS)
         .build()
         .unwrap();
     let (window, event_loop) = Window::new(&runtime)?;
