@@ -1,3 +1,5 @@
+use std::sync::mpsc::Sender;
+
 use common::{
     block::Block,
     coord::{BlockCoord, ChunkCoord},
@@ -9,6 +11,8 @@ use crate::render::primitives::quad::Quad;
 
 use super::primitives::vertex::Vertex;
 
+pub type MeshTaskResult = (ChunkCoord, TerrainMesh);
+
 /// Mesh builder for terrain chunks
 pub struct TerrainMesh {
     pub vertices: Vec<Vertex>,
@@ -16,6 +20,10 @@ pub struct TerrainMesh {
 }
 
 impl TerrainMesh {
+    pub fn task(tx: Sender<MeshTaskResult>, coord: ChunkCoord, blocks: &[Block]) {
+        let _ = tx.send((coord, Self::build(coord, blocks)));
+    }
+
     pub fn build(coord: ChunkCoord, blocks: &[Block]) -> Self {
         prof!("TerrainMesh::build");
 

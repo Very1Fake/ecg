@@ -3,8 +3,8 @@ use common::span;
 use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 use wgpu::{
-    Backends, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Instance,
-    Limits, PowerPreference, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
+    Backends, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features,
+    Instance, PowerPreference, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
     SurfaceError, TextureUsages,
 };
 use wgpu_profiler::{GpuProfiler, GpuTimerScopeResult};
@@ -123,9 +123,10 @@ impl Renderer {
         let (device, queue) = runtime.block_on(adapter.request_device(
             &DeviceDescriptor {
                 label: Some("GraphicDevice"),
-                features: adapter.features() | GpuProfiler::ALL_WGPU_TIMER_FEATURES,
+                features: (adapter.features() | GpuProfiler::ALL_WGPU_TIMER_FEATURES)
+                    - Features::MAPPABLE_PRIMARY_BUFFERS,
                 // TODO: Decide wether to support WASM target or not
-                limits: Limits::default(),
+                limits: adapter.limits(),
             },
             None,
         ))?;

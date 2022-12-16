@@ -21,9 +21,10 @@ fn main() -> Result<(), Error> {
 
     info!("Starting game instance. ECG v{VERSION}");
 
+    let cores = num_cpus::get();
     let runtime = Builder::new_multi_thread()
         .worker_threads(2)
-        .max_blocking_threads(8)
+        .max_blocking_threads((cores / 2).max(2))
         .build()
         .unwrap();
     let (window, event_loop) = Window::new(&runtime)?;

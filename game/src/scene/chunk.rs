@@ -1,14 +1,22 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::mpsc::{channel, Receiver, Sender},
+};
 
 use common::{
     block::Block,
     coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE},
     span,
 };
+use tokio::runtime::Runtime;
 use wgpu::{BufferUsages, Device};
 
 use crate::{
-    render::{buffer::Buffer, mesh::TerrainMesh, primitives::vertex::Vertex},
+    render::{
+        buffer::Buffer,
+        mesh::{MeshTaskResult, TerrainMesh},
+        primitives::vertex::Vertex,
+    },
     types::F32x3,
 };
 
@@ -18,42 +26,62 @@ pub struct ChunkManager {
     // TODO: Move to game settings
     pub draw_distance: u16,
 
+    pub mesh_builder_rx: Receiver<MeshTaskResult>,
+    pub mesh_builder_tx: Sender<MeshTaskResult>,
+
     pub logic: HashMap<ChunkId, LogicChunk>,
     pub terrain: HashMap<ChunkId, TerrainChunk>,
 }
 
 impl ChunkManager {
     // Limits
-    pub const MESH_BUILDS_PER_FRAME: usize = 4;
     pub const MAX_LOADS_PER_FRAME: usize = 2;
     pub const MAX_UNLOADS_PER_FRAME: usize = 4;
     pub const MIN_DRAW_DISTANCE: u16 = 2;
     pub const MAX_DRAW_DISTANCE: u16 = 256;
 
     pub fn new() -> Self {
+        let (mesh_builder_tx, mesh_builder_rx) = channel();
+
         Self {
             draw_distance: Self::MIN_DRAW_DISTANCE,
+
+            mesh_builder_rx,
+            mesh_builder_tx,
+
             logic: HashMap::new(),
             terrain: HashMap::new(),
         }
     }
 
     /// Maintain chunk manager. Regenerate chunk meshes.
-    pub fn maintain(&mut self, device: &Device, camera: &Camera) {
+    pub fn maintain(&mut self, device: &Device, runtime: &Runtime, camera: &Camera) {
         span!(_guard, "maintain", "ChunkManager::maintain");
 
+        // Collect generated meshes
+        self.mesh_builder_rx
+            .try_iter()
+            .take(4)
+            .for_each(|(coord, mesh)| {
+                // TODO: Check if terrain already rebuilt
+                self.terrain
+                    .insert(coord.to_id(), TerrainChunk::new(device, mesh));
+            });
+
+        // Run mesh generating tasks
         self.logic
             .iter_mut()
             .filter(|(_, chunk)| chunk.is_dirty())
-            .take(Self::MESH_BUILDS_PER_FRAME)
             .for_each(|(coord, chunk)| {
                 // TODO: Add a check for an empty mesh when it'll be aware of neighboring blocks
                 // Check if chunk has at least one opaque block. Otherwise skip mesh building
                 if chunk.blocks.iter().any(|block| block.opaque()) {
-                    let mesh = TerrainMesh::build(coord.to_coord(), &chunk.blocks);
-                    tracing::debug!(?coord, "Building mesh for chunk");
-
-                    self.terrain.insert(*coord, TerrainChunk::new(device, mesh));
+                    let tx = self.mesh_builder_tx.clone();
+                    let coord = *coord;
+                    let blocks = chunk.blocks;
+                    runtime.spawn_blocking(move || {
+                        TerrainMesh::task(tx, coord.to_coord(), &blocks);
+                    });
                 }
                 chunk.dirty = false;
             });

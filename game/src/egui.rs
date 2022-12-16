@@ -444,7 +444,7 @@ impl DebugOverlayState {
                                     .get_mut(&self.painter.block_pos.to_chunk_id())
                                 {
                                     chunk.blocks_mut()
-                                        [self.painter.block_pos.to_block().flatten() as usize] =
+                                        [self.painter.block_pos.to_block().flatten()] =
                                         Block::from(self.painter.block);
                                 }
                             }

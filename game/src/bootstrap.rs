@@ -12,7 +12,7 @@ pub enum BootstrapError {
 pub fn bootstrap() -> Result<(), BootstrapError> {
     fmt()
         .with_env_filter(format!(
-            "{},wgpu_core=info",
+            "{},wgpu_core=info,wgpu_hal=info,naga=info",
             match var("LOG_LEVEL") {
                 Ok(level) => {
                     match level.to_lowercase().as_str() {

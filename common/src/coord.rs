@@ -122,6 +122,14 @@ impl ChunkCoord {
         }
     }
 
+    pub fn to_id(&self) -> ChunkId {
+        ChunkId {
+            x: self.x.div_euclid(G_CHUNK_SIZE),
+            y: self.y.div_euclid(G_CHUNK_SIZE),
+            z: self.z.div_euclid(G_CHUNK_SIZE),
+        }
+    }
+
     pub fn to_global(&self, block: &BlockCoord) -> GlobalCoord {
         GlobalCoord::new(
             self.x.add(block.x as GlobalUnit),

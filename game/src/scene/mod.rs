@@ -196,7 +196,7 @@ impl Scene {
         );
 
         self.chunk_manager
-            .maintain(&game.window.renderer().device, &self.camera);
+            .maintain(&game.window.renderer().device, &game.runtime, &self.camera);
 
         // Update voxel position
         if matches!(self.camera.mode, CameraMode::ThirdPerson) {
