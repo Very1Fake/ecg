@@ -1,7 +1,8 @@
-use std::env::var;
+use std::{env::var, str::FromStr};
 
 use thiserror::Error;
-use tracing_subscriber::fmt::fmt;
+use tracing::metadata::LevelFilter;
+use tracing_subscriber::{fmt::fmt, EnvFilter};
 
 #[derive(Error, Debug)]
 pub enum BootstrapError {
@@ -9,24 +10,35 @@ pub enum BootstrapError {
     LogLevelError(Option<String>),
 }
 
+pub const DEFAULT_LOG_FILTER: &[&str] = &[
+    "wgpu_core=info",
+    "wgpu_core::instance=warn",
+    "wgpu_core::device=warn",
+    "wgpu_hal=info",
+    "naga=info",
+];
+
 pub fn bootstrap() -> Result<(), BootstrapError> {
-    fmt()
-        .with_env_filter(format!(
-            "{},wgpu_core=info,wgpu_hal=info,naga=info",
-            match var("LOG_LEVEL") {
-                Ok(level) => {
-                    match level.to_lowercase().as_str() {
-                        "trace" | "debug" | "info" | "warn" | "error" => level,
-                        _ => return Err(BootstrapError::LogLevelError(Some(level))),
-                    }
-                }
-                #[cfg(debug_assertions)]
-                Err(_) => String::from("trace"),
-                #[cfg(not(debug_assertions))]
-                Err(_) => String::from("info"),
-            }
-        ))
-        .init();
+    let mut filter = EnvFilter::default().add_directive(
+        match var("LOG_LEVEL") {
+            Ok(level) => match LevelFilter::from_str(level.to_lowercase().as_str()) {
+                Ok(level) => level,
+                Err(_) => return Err(BootstrapError::LogLevelError(Some(level))),
+            },
+            #[cfg(debug_assertions)]
+            Err(_) => LevelFilter::TRACE,
+            #[cfg(not(debug_assertions))]
+            Err(_) => LevelFilter::INFO,
+        }
+        .into(),
+    );
+
+    for dir in DEFAULT_LOG_FILTER {
+        filter = filter.add_directive(dir.parse().unwrap());
+    }
+
+    // TODO: Add log file support
+    fmt().with_env_filter(filter).init();
 
     Ok(())
 }
