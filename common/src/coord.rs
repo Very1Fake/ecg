@@ -162,7 +162,7 @@ impl BlockCoord {
     }
 
     pub fn flatten(&self) -> usize {
-        (self.z as usize).mul(CHUNK_SQUARE) + (self.y as usize).mul(CHUNK_SIZE) + self.x as usize
+        (self.x as usize).mul(CHUNK_SQUARE) + (self.y as usize).mul(CHUNK_SIZE) + self.z as usize
     }
 }
 
