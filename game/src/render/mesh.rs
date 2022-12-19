@@ -1,13 +1,12 @@
 use std::sync::mpsc::Sender;
 
+use crate::render::primitives::quad::Quad;
 use common::{
     block::Block,
     coord::{BlockCoord, ChunkCoord},
     direction::Direction,
     prof,
 };
-
-use crate::render::primitives::quad::Quad;
 
 use super::primitives::vertex::Vertex;
 
@@ -34,35 +33,33 @@ impl TerrainMesh {
         blocks
             .iter()
             .enumerate()
-            .filter(|(id, &block)| {
+            .filter_map(|(id, block)| {
                 if block.opaque() {
-                    let pos = BlockCoord::from(*id);
+                    let pos = BlockCoord::from(id);
+                    let g_pos = coord.to_global(&pos).as_vec();
+                    let mut faces = Vec::new();
 
-                    !Direction::ALL.iter().all(|&dir| {
-                        if pos.at_edge(dir) {
-                            false
-                        } else {
-                            blocks[pos.neighbor(dir).flatten()].opaque()
+                    Direction::ALL.iter().for_each(|&dir| {
+                        if pos.on_chunk_edge(dir) || !blocks[pos.neighbor(dir).flatten()].opaque() {
+                            faces.push(Quad::new(dir, g_pos));
                         }
-                    })
-                } else {
-                    false
+                    });
+
+                    if !faces.is_empty() {
+                        return Some((block, faces));
+                    }
                 }
+
+                None
             })
-            .for_each(|(flat_coord, block)| {
-                let pos = coord
-                    .to_global(&BlockCoord::from(flat_coord as i64))
-                    .as_vec();
-                let mut block_vertices = Direction::ALL
+            .for_each(|(block, faces)| {
+                let mut block_vertices = faces
                     .into_iter()
-                    .flat_map(|dir| {
-                        Quad::new(dir, pos)
-                            .corners()
-                            .into_iter()
-                            .map(|position| Vertex {
-                                position,
-                                color: block.color(),
-                            })
+                    .flat_map(|quad| {
+                        quad.corners().into_iter().map(|position| Vertex {
+                            position,
+                            color: block.color(),
+                        })
                     })
                     .collect::<Vec<_>>();
 

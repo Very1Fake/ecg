@@ -150,7 +150,7 @@ pub struct BlockCoord {
 }
 
 impl BlockCoord {
-    pub fn at_edge(&self, dir: Direction) -> bool {
+    pub fn on_chunk_edge(&self, dir: Direction) -> bool {
         match dir {
             Direction::Down => self.y == 0,
             Direction::Up => self.y == L_CHUNK_SIZE - 1,
