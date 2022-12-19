@@ -47,8 +47,8 @@ macro_rules! coord_base_impl {
                     let mut new = *self;
 
                     match dir {
-                        Direction::Up => new.y += 1,
                         Direction::Down => new.y -= 1,
+                        Direction::Up => new.y += 1,
                         Direction::Left => new.x -= 1,
                         Direction::Right => new.x += 1,
                         Direction::Front => new.z -= 1,
@@ -152,8 +152,8 @@ pub struct BlockCoord {
 impl BlockCoord {
     pub fn at_edge(&self, dir: Direction) -> bool {
         match dir {
-            Direction::Up => self.y == L_CHUNK_SIZE - 1,
             Direction::Down => self.y == 0,
+            Direction::Up => self.y == L_CHUNK_SIZE - 1,
             Direction::Left => self.x == 0,
             Direction::Right => self.x == L_CHUNK_SIZE - 1,
             Direction::Front => self.z == 0,

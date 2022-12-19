@@ -34,17 +34,17 @@ impl Quad {
         let pos = self.position;
 
         match self.direction {
-            Direction::Up => [
-                Self::RIGHT_UP_BACK + pos,
-                Self::RIGHT_UP_FRONT + pos,
-                Self::LEFT_UP_FRONT + pos,
-                Self::LEFT_UP_BACK + pos,
-            ],
             Direction::Down => [
                 Self::RIGHT_DOWN_FRONT + pos,
                 Self::RIGHT_DOWN_BACK + pos,
                 Self::LEFT_DOWN_BACK + pos,
                 Self::LEFT_DOWN_FRONT + pos,
+            ],
+            Direction::Up => [
+                Self::RIGHT_UP_BACK + pos,
+                Self::RIGHT_UP_FRONT + pos,
+                Self::LEFT_UP_FRONT + pos,
+                Self::LEFT_UP_BACK + pos,
             ],
             Direction::Left => [
                 Self::LEFT_UP_FRONT + pos,

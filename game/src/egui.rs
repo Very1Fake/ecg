@@ -110,7 +110,7 @@ pub struct DebugOverlayState {
     /// Graphics tweaks window
     graphics_opened: bool,
     /// GPU timings
-    gpu_timing_opened: bool,
+    gpu_stats_opened: bool,
     /// Camera tweaks window
     camera_opened: bool,
     /// Chunk tweaks window
@@ -128,7 +128,7 @@ impl DebugOverlayState {
         Self {
             top_bar_visible: true,
             graphics_opened: false,
-            gpu_timing_opened: false,
+            gpu_stats_opened: false,
             camera_opened: false,
             chunks_opened: false,
             painter_opened: false,
@@ -157,8 +157,8 @@ impl DebugOverlayState {
                     global_dark_light_mode_switch(ui);
                     ui.separator();
                     ui.menu_button("Game", |menu| {
-                        if menu.button("GPU Timings").clicked() {
-                            self.gpu_timing_opened = true;
+                        if menu.button("GPU Stats").clicked() {
+                            self.gpu_stats_opened = true;
                         }
                         if menu.button("Graphics").clicked() {
                             self.graphics_opened = true;
@@ -192,8 +192,8 @@ impl DebugOverlayState {
             });
         }
 
-        Window::new("GPU Timings")
-            .open(&mut self.gpu_timing_opened)
+        Window::new("GPU Stats")
+            .open(&mut self.gpu_stats_opened)
             .resizable(false)
             .show(ctx, |ui| {
                 ui.label(format!("wgpu Backend: {}", renderer.graphics_backend(),));
@@ -207,6 +207,20 @@ impl DebugOverlayState {
                             timing.2 * 1000.0
                         ));
                     });
+                });
+                ui.collapsing("Buffers", |ui| {
+                    let (terrain_vertices, terrain_indices) = chunk_manager.terrain.values().fold(
+                        (0, 0),
+                        |(vertices, indices), chunk| {
+                            (
+                                vertices + chunk.vertex_buffer.length(),
+                                indices + chunk.index_buffer.length(),
+                            )
+                        },
+                    );
+                    ui.label("Terrain Chunks:");
+                    ui.label(format!("\tVertices: {}", terrain_vertices));
+                    ui.label(format!("\tIndices: {}", terrain_indices));
                 });
             });
 
