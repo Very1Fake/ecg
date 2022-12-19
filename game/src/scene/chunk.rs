@@ -104,6 +104,8 @@ impl ChunkManager {
 
                     chunk.status = TerrainStatus::Pending;
                 } else {
+                    // Free old mesh buffer for updated empty chunk
+                    self.terrain.remove(coord);
                     chunk.status = TerrainStatus::Built;
                 }
             });
