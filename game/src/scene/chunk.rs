@@ -1,4 +1,5 @@
 use std::{
+
     collections::{HashMap, HashSet},
     sync::mpsc::{channel, Receiver, Sender},
 };
@@ -10,7 +11,7 @@ use common::{
 };
 use tokio::runtime::Runtime;
 use wgpu::{BufferUsages, Device};
-
+use noise::{NoiseFn, Perlin, Seedable};
 use crate::{
     consts::{BLOCKING_THREADS, CPU_CORES},
     render::{
@@ -195,18 +196,16 @@ impl LogicChunk {
 
     fn generate_flat(id: ChunkId) -> LogicChunk {
         prof!("LogicChunk::generate_flat");
-
+        let perlin = Perlin::new(Perlin::DEFAULT_SEED);
         let coord = id.to_coord();
         let mut blocks = [Block::Air; CHUNK_CUBE];
-
         blocks.iter_mut().enumerate().for_each(|(i, block)| {
             let pos = coord.to_global(&BlockCoord::from(i));
-
-            match pos.y {
-                0 => *block = Block::Grass,
-                -10..=-1 => *block = Block::Dirt,
-                -128..=-11 => *block = Block::Stone,
-                GlobalUnit::MIN..=-129 => *block = Block::Stone,
+            match pos.y as f64 - perlin.get([pos.x as f64 + 0.1, pos.z as f64 + 0.1]) {
+                0.0 => *block = Block::Grass,
+                -10.0..=-1.0 => *block = Block::Dirt,
+                -128.0..=-11.0 => *block = Block::Stone,
+                ..=-129.0 => *block = Block::Stone,
                 _ => {}
             };
         });
