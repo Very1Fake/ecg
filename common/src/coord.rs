@@ -1,10 +1,10 @@
-use std::ops::{Add, Mul, Sub};
+use std::ops::Mul;
 
-use glam::Vec3;
+use glam::{IVec3, Vec3};
 
 use crate::direction::Direction;
 
-pub type GlobalUnit = i64;
+pub type GlobalUnit = i32;
 pub type LocalUnit = u8;
 
 pub const CHUNK_SIZE: usize = 16;
@@ -25,34 +25,34 @@ macro_rules! coord_base_impl {
     ($repr:tt, $($T:ty),+) => {
         $(
             impl $T {
-                pub const ZERO: Self = <$T>::new(0, 0, 0);
+                pub const ZERO: Self = <$T>::from_vec(IVec3::ZERO);
 
                 pub const fn new(x: $repr, y: $repr, z: $repr) -> Self {
-                    Self { x, y, z }
+                    Self(IVec3::new(x, y, z))
                 }
 
-                pub fn from_vec3(vec: Vec3) -> Self {
-                    Self {
-                        x: vec.x as $repr,
-                        y: vec.y as $repr,
-                        z: vec.z as $repr,
-                    }
+                pub const fn from_vec(vec: IVec3) -> Self {
+                    Self(vec)
+                }
+
+                pub fn from_float_vec(vec: Vec3) -> Self {
+                    Self(vec.as_ivec3())
                 }
 
                 pub fn as_vec(&self) -> Vec3 {
-                    Vec3::new(self.x as f32, self.y as f32, self.z as f32)
+                    self.0.as_vec3()
                 }
 
                 pub const fn neighbor(&self, dir: Direction) -> Self {
                     let mut new = *self;
 
                     match dir {
-                        Direction::Down => new.y -= 1,
-                        Direction::Up => new.y += 1,
-                        Direction::Left => new.x -= 1,
-                        Direction::Right => new.x += 1,
-                        Direction::Front => new.z -= 1,
-                        Direction::Back => new.z += 1,
+                        Direction::Down => new.0.y -= 1,
+                        Direction::Up => new.0.y += 1,
+                        Direction::Left => new.0.x -= 1,
+                        Direction::Right => new.0.x += 1,
+                        Direction::Front => new.0.z -= 1,
+                        Direction::Back => new.0.z += 1,
                     }
 
                     new
@@ -69,37 +69,17 @@ macro_rules! coord_base_impl {
 }
 
 coord_base_impl!(GlobalUnit, ChunkId, ChunkCoord, GlobalCoord);
-coord_base_impl!(LocalUnit, BlockCoord);
+// coord_base_impl!(LocalUnit, BlockCoord);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Represents chunk id
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
-pub struct ChunkId {
-    pub x: GlobalUnit,
-    pub y: GlobalUnit,
-    pub z: GlobalUnit,
-}
+pub struct ChunkId(pub IVec3);
 
 impl ChunkId {
     pub fn to_coord(&self) -> ChunkCoord {
-        ChunkCoord::new(
-            self.x * G_CHUNK_SIZE,
-            self.y * G_CHUNK_SIZE,
-            self.z * G_CHUNK_SIZE,
-        )
-    }
-}
-
-impl Sub<GlobalUnit> for ChunkId {
-    type Output = ChunkId;
-
-    fn sub(self, rhs: GlobalUnit) -> Self::Output {
-        Self {
-            x: self.x.sub(rhs),
-            y: self.y.sub(rhs),
-            z: self.z.sub(rhs),
-        }
+        ChunkCoord::from_vec(self.0 * G_CHUNK_SIZE)
     }
 }
 
@@ -107,34 +87,29 @@ impl Sub<GlobalUnit> for ChunkId {
 
 /// Represents the coordinates of a chunk in a world
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
-pub struct ChunkCoord {
-    pub x: GlobalUnit,
-    pub y: GlobalUnit,
-    pub z: GlobalUnit,
-}
+pub struct ChunkCoord(pub IVec3);
 
 impl ChunkCoord {
     pub fn new_checked(x: GlobalUnit, y: GlobalUnit, z: GlobalUnit) -> Self {
-        Self {
-            x: x.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
-            y: y.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
-            z: z.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
-        }
+        Self(IVec3::new(
+            x.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+            y.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+            z.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
+        ))
     }
 
     pub fn to_id(&self) -> ChunkId {
-        ChunkId {
-            x: self.x.div_euclid(G_CHUNK_SIZE),
-            y: self.y.div_euclid(G_CHUNK_SIZE),
-            z: self.z.div_euclid(G_CHUNK_SIZE),
-        }
+        ChunkId::from_vec(self.0 / G_CHUNK_SIZE)
     }
 
     pub fn to_global(&self, block: &BlockCoord) -> GlobalCoord {
-        GlobalCoord::new(
-            self.x.add(block.x as GlobalUnit),
-            self.y.add(block.y as GlobalUnit),
-            self.z.add(block.z as GlobalUnit),
+        GlobalCoord::from_vec(
+            self.0
+                + IVec3::new(
+                    block.x as GlobalUnit,
+                    block.y as GlobalUnit,
+                    block.z as GlobalUnit,
+                ),
         )
     }
 }
@@ -150,6 +125,47 @@ pub struct BlockCoord {
 }
 
 impl BlockCoord {
+    pub const ZERO: Self = Self::new(0, 0, 0);
+
+    pub const fn new(x: LocalUnit, y: LocalUnit, z: LocalUnit) -> Self {
+        Self { x, y, z }
+    }
+
+    // pub const fn from_vec(vec: IVec3) -> Self {
+    //     Self {
+    //         x: vec.x as LocalUnit,
+    //         y: vec.y as LocalUnit,
+    //         z: vec.z as LocalUnit,
+    //     }
+    // }
+
+    // pub const fn from_float_vec(vec: Vec3) -> Self {
+    //     Self {
+    //         x: vec.x as LocalUnit,
+    //         y: vec.y as LocalUnit,
+    //         z: vec.z as LocalUnit,
+    //     }
+    // }
+
+    pub fn as_vec(&self) -> Vec3 {
+        Vec3::new(self.x as f32, self.y as f32, self.z as f32)
+    }
+
+    pub const fn neighbor(&self, dir: Direction) -> Self {
+        let mut new = *self;
+
+        match dir {
+            Direction::Down => new.y -= 1,
+            Direction::Up => new.y += 1,
+            Direction::Left => new.x -= 1,
+            Direction::Right => new.x += 1,
+            Direction::Front => new.z -= 1,
+            Direction::Back => new.z += 1,
+        }
+
+        new
+    }
+
     pub fn on_chunk_edge(&self, dir: Direction) -> bool {
         match dir {
             Direction::Down => self.y == 0,
@@ -163,6 +179,12 @@ impl BlockCoord {
 
     pub fn flatten(&self) -> usize {
         (self.x as usize).mul(CHUNK_SQUARE) + (self.y as usize).mul(CHUNK_SIZE) + self.z as usize
+    }
+}
+
+impl Default for BlockCoord {
+    fn default() -> Self {
+        Self::ZERO
     }
 }
 
@@ -190,34 +212,22 @@ impl From<GlobalUnit> for BlockCoord {
 
 /// Represents the coordinates of a block in the world
 #[derive(Hash, PartialEq, Eq, Clone, Copy, Debug)]
-pub struct GlobalCoord {
-    pub x: GlobalUnit,
-    pub y: GlobalUnit,
-    pub z: GlobalUnit,
-}
+pub struct GlobalCoord(pub IVec3);
 
 impl GlobalCoord {
     pub fn to_chunk_id(&self) -> ChunkId {
-        ChunkId::new(
-            self.x.div_euclid(G_CHUNK_SIZE),
-            self.y.div_euclid(G_CHUNK_SIZE),
-            self.z.div_euclid(G_CHUNK_SIZE),
-        )
+        ChunkId::from_vec(self.0 / G_CHUNK_SIZE)
     }
 
     pub fn to_chunk(&self) -> ChunkCoord {
-        ChunkCoord::new(
-            self.x.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
-            self.y.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
-            self.z.div_euclid(G_CHUNK_SIZE).mul(G_CHUNK_SIZE),
-        )
+        ChunkCoord::from_vec((self.0 / G_CHUNK_SIZE) * G_CHUNK_SIZE)
     }
 
     pub fn to_block(&self) -> BlockCoord {
         BlockCoord::new(
-            (self.x as LocalUnit).rem_euclid(L_CHUNK_SIZE),
-            (self.y as LocalUnit).rem_euclid(L_CHUNK_SIZE),
-            (self.z as LocalUnit).rem_euclid(L_CHUNK_SIZE),
+            (self.0.x as LocalUnit).rem_euclid(L_CHUNK_SIZE),
+            (self.0.y as LocalUnit).rem_euclid(L_CHUNK_SIZE),
+            (self.0.z as LocalUnit).rem_euclid(L_CHUNK_SIZE),
         )
     }
 }

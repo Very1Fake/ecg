@@ -112,8 +112,8 @@ impl ChunkManager {
 
         // Load new chunks
         LoadArea::new(
-            GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
-            self.draw_distance as i64,
+            GlobalCoord::from_float_vec(camera.pos).to_chunk_id(),
+            self.draw_distance as GlobalUnit,
         )
         .filter(|id| {
             !self.logic.contains_key(id)
@@ -202,7 +202,7 @@ impl LogicChunk {
         blocks.iter_mut().enumerate().for_each(|(i, block)| {
             let pos = coord.to_global(&BlockCoord::from(i));
 
-            match pos.y {
+            match pos.0.y {
                 0 => *block = Block::Grass,
                 -10..=-1 => *block = Block::Dirt,
                 -128..=-11 => *block = Block::Stone,
@@ -246,8 +246,10 @@ pub struct LoadArea {
 
 impl LoadArea {
     pub fn new(center: ChunkId, radius: GlobalUnit) -> Self {
-        let start = ChunkId::new(center.x - radius, center.y - radius / 2, center.z - radius);
-        let end = ChunkId::new(center.x + radius, center.y + radius / 2, center.z + radius);
+        let mut start = ChunkId::from_vec(center.0 - radius);
+        start.0.y = center.0.y - radius / 2;
+        let mut end = ChunkId::from_vec(center.0 + radius);
+        end.0.y = center.0.y + radius / 2;
 
         Self {
             start,
@@ -261,7 +263,7 @@ impl Iterator for LoadArea {
     type Item = ChunkId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.current.z > self.end.z {
+        if self.current.0.z > self.end.0.z {
             return None;
         }
 
@@ -277,11 +279,11 @@ impl Iterator for LoadArea {
             }
         }
 
-        if clamped_inc(&mut new.x, self.end.x) {
-            new.x = self.start.x;
-            if clamped_inc(&mut new.y, self.end.y) {
-                new.y = self.start.y;
-                clamped_inc(&mut new.z, self.end.z + 1);
+        if clamped_inc(&mut new.0.x, self.end.0.x) {
+            new.0.x = self.start.0.x;
+            if clamped_inc(&mut new.0.y, self.end.0.y) {
+                new.0.y = self.start.0.y;
+                clamped_inc(&mut new.0.z, self.end.0.z + 1);
             }
         }
 

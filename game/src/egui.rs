@@ -474,19 +474,19 @@ impl DebugOverlayState {
 
                         ui.horizontal(|ui| {
                             ui.add(
-                                DragValue::new(&mut self.painter.block_pos.x)
+                                DragValue::new(&mut self.painter.block_pos.0.x)
                                     .prefix("x: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
                             );
                             ui.add(
-                                DragValue::new(&mut self.painter.block_pos.y)
+                                DragValue::new(&mut self.painter.block_pos.0.y)
                                     .prefix("y: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
                             );
                             ui.add(
-                                DragValue::new(&mut self.painter.block_pos.z)
+                                DragValue::new(&mut self.painter.block_pos.0.z)
                                     .prefix("z: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
@@ -510,19 +510,19 @@ impl DebugOverlayState {
                         });
                         ui.horizontal(|ui| {
                             ui.add(
-                                DragValue::new(&mut self.painter.chunk_id.x)
+                                DragValue::new(&mut self.painter.chunk_id.0.x)
                                     .prefix("x: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
                             );
                             ui.add(
-                                DragValue::new(&mut self.painter.chunk_id.y)
+                                DragValue::new(&mut self.painter.chunk_id.0.y)
                                     .prefix("y: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
                             );
                             ui.add(
-                                DragValue::new(&mut self.painter.chunk_id.z)
+                                DragValue::new(&mut self.painter.chunk_id.0.z)
                                     .prefix("z: ")
                                     .fixed_decimals(0)
                                     .speed(1.0),
@@ -543,19 +543,19 @@ impl DebugOverlayState {
             .show(ctx, |ui| {
                 Grid::new("teleport").num_columns(3).show(ui, |ui| {
                     ui.add(
-                        DragValue::new(&mut self.teleport.target_pos.x)
+                        DragValue::new(&mut self.teleport.target_pos.0.x)
                             .prefix("x: ")
                             .fixed_decimals(0)
                             .speed(1.0),
                     );
                     ui.add(
-                        DragValue::new(&mut self.teleport.target_pos.y)
+                        DragValue::new(&mut self.teleport.target_pos.0.y)
                             .prefix("y: ")
                             .fixed_decimals(0)
                             .speed(1.0),
                     );
                     ui.add(
-                        DragValue::new(&mut self.teleport.target_pos.z)
+                        DragValue::new(&mut self.teleport.target_pos.0.z)
                             .prefix("z: ")
                             .fixed_decimals(0)
                             .speed(1.0),
@@ -566,7 +566,7 @@ impl DebugOverlayState {
                         self.teleport = Teleport::new();
                     }
                     if ui.button("Player Position").clicked() {
-                        self.teleport.target_pos = GlobalCoord::from_vec3(camera.pos);
+                        self.teleport.target_pos = GlobalCoord::from_float_vec(camera.pos);
                     }
                     if ui.button("Teleport").clicked() {
                         camera.f_pos = self.teleport.target_pos.as_vec();
