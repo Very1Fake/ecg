@@ -117,10 +117,13 @@ pub struct DebugOverlayState {
     chunks_opened: bool,
     /// Block changer
     painter_opened: bool,
+    /// Teleport window
+    teleport_opened: bool,
 
     // Sub states
     graphics_tweaks: GraphicsTweaks,
     painter: Painter,
+    teleport: Teleport,
 }
 
 impl DebugOverlayState {
@@ -132,8 +135,10 @@ impl DebugOverlayState {
             camera_opened: false,
             chunks_opened: false,
             painter_opened: false,
+            teleport_opened: false,
             graphics_tweaks: GraphicsTweaks::new(),
             painter: Painter::new(),
+            teleport: Teleport::new(),
         }
     }
 
@@ -180,6 +185,9 @@ impl DebugOverlayState {
                     ui.menu_button("Cheats", |menu| {
                         if menu.button("Painter").clicked() {
                             self.painter_opened = true;
+                        }
+                        if menu.button("Teleport").clicked() {
+                            self.teleport_opened = true;
                         }
                     });
                     ui.separator();
@@ -528,6 +536,43 @@ impl DebugOverlayState {
                     self.painter = Painter::new();
                 }
             });
+
+        Window::new("Teleport")
+            .open(&mut self.teleport_opened)
+            .resizable(false)
+            .show(ctx, |ui| {
+                Grid::new("teleport").num_columns(3).show(ui, |ui| {
+                    ui.add(
+                        DragValue::new(&mut self.teleport.target_pos.x)
+                            .prefix("x: ")
+                            .fixed_decimals(0)
+                            .speed(1.0),
+                    );
+                    ui.add(
+                        DragValue::new(&mut self.teleport.target_pos.y)
+                            .prefix("y: ")
+                            .fixed_decimals(0)
+                            .speed(1.0),
+                    );
+                    ui.add(
+                        DragValue::new(&mut self.teleport.target_pos.z)
+                            .prefix("z: ")
+                            .fixed_decimals(0)
+                            .speed(1.0),
+                    );
+                    ui.end_row();
+
+                    if ui.button("Reset").clicked() {
+                        self.teleport = Teleport::new();
+                    }
+                    if ui.button("Player Position").clicked() {
+                        self.teleport.target_pos = GlobalCoord::from_vec3(camera.pos);
+                    }
+                    if ui.button("Teleport").clicked() {
+                        camera.f_pos = self.teleport.target_pos.as_vec();
+                    }
+                });
+            });
     }
 }
 
@@ -563,6 +608,18 @@ impl Painter {
             block_pos: GlobalCoord::ZERO,
             chunk_id: ChunkId::ZERO,
             block: Block::Stone as BlockRepr,
+        }
+    }
+}
+
+pub struct Teleport {
+    target_pos: GlobalCoord,
+}
+
+impl Teleport {
+    pub const fn new() -> Self {
+        Self {
+            target_pos: GlobalCoord::ZERO,
         }
     }
 }
