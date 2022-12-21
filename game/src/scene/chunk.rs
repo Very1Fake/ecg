@@ -111,10 +111,12 @@ impl ChunkManager {
             });
 
         // Load new chunks
-        LoadArea::new(
+        LoadedArea::new_cuboid(
             GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
             self.draw_distance as i64,
         )
+        .collect::<Vec<_>>()
+        .iter()
         .filter(|id| {
             !self.logic.contains_key(id)
                 && !self.chunk_gen_ids.contains(id)
@@ -123,8 +125,7 @@ impl ChunkManager {
         .take(*BLOCKING_THREADS * 4 - self.chunk_gen_ids.len())
         .collect::<Vec<_>>()
         .iter()
-        .for_each(|id| {
-            let id = *id;
+        .for_each(|&&id| {
             self.chunk_gen_ids.insert(id);
 
             let tx = self.chunk_gen_tx.clone();
@@ -132,6 +133,22 @@ impl ChunkManager {
                 let _ = tx.send((id, LogicChunk::generate_flat(id)));
             });
         });
+
+        // Unload old chunks
+        let load_area = LoadedArea::new_cuboid(
+            GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
+            self.draw_distance as i64,
+        );
+        self.logic
+            .keys()
+            .filter(|&id| !load_area.contains(*id))
+            .copied()
+            .collect::<Vec<_>>()
+            .iter()
+            .for_each(|id| {
+                self.logic.remove(id);
+                self.terrain.remove(id);
+            });
     }
 
     pub fn cleanup(&mut self) {
@@ -238,26 +255,46 @@ impl TerrainChunk {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LoadArea {
+pub struct LoadedArea {
     start: ChunkId,
     end: ChunkId,
     current: ChunkId,
 }
 
-impl LoadArea {
-    pub fn new(center: ChunkId, radius: GlobalUnit) -> Self {
-        let start = ChunkId::new(center.x - radius, center.y - radius / 2, center.z - radius);
-        let end = ChunkId::new(center.x + radius, center.y + radius / 2, center.z + radius);
-
+impl LoadedArea {
+    const fn new(start: ChunkId, end: ChunkId) -> Self {
         Self {
             start,
             end,
             current: start,
         }
     }
+
+    pub fn new_cube(center: ChunkId, dist: GlobalUnit) -> Self {
+        Self::new(
+            ChunkId::new(center.x - dist, center.y - dist, center.z - dist),
+            ChunkId::new(center.x + dist, center.y + dist, center.z + dist),
+        )
+    }
+
+    pub fn new_cuboid(center: ChunkId, dist: GlobalUnit) -> Self {
+        Self::new(
+            ChunkId::new(center.x - dist, center.y - dist / 2, center.z - dist),
+            ChunkId::new(center.x + dist, center.y + dist / 2, center.z + dist),
+        )
+    }
+
+    pub fn contains(&self, id: ChunkId) -> bool {
+        !(id.x < self.start.x
+            || id.x > self.end.x
+            || id.y < self.start.y
+            || id.y > self.end.y
+            || id.z < self.start.z
+            || id.z > self.end.z)
+    }
 }
 
-impl Iterator for LoadArea {
+impl Iterator for LoadedArea {
     type Item = ChunkId;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -294,11 +331,11 @@ impl Iterator for LoadArea {
 mod tests {
     use common::coord::ChunkId;
 
-    use super::LoadArea;
+    use super::LoadedArea;
 
     #[test]
     fn load_area() {
-        let chunks = LoadArea::new(ChunkId::ZERO, 1).collect::<Vec<_>>();
+        let chunks = LoadedArea::new_cube(ChunkId::ZERO, 1).collect::<Vec<_>>();
 
         eprintln!("{}", chunks.len());
 
