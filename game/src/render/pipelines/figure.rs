@@ -1,4 +1,4 @@
-use common::span;
+use common_log::span;
 use wgpu::{
     BindGroupLayoutEntry, BindingType, BlendState, BufferBindingType, ColorTargetState,
     ColorWrites, CompareFunction, DepthBiasState, DepthStencilState, Device, Face, FragmentState,

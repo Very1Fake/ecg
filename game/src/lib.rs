@@ -1,4 +1,5 @@
-use common::{clock::Clock, prof, span};
+use common::clock::Clock;
+use common_log::{prof, span};
 use tokio::runtime::Runtime;
 use tracing::{debug, info};
 use winit::{event::WindowEvent, event_loop::ControlFlow};
@@ -118,7 +119,7 @@ impl Game {
 
             // Finish tracy frame
             #[cfg(feature = "tracy")]
-            common::tracy_client::frame_mark();
+            common_log::tracy_client::frame_mark();
         }
     }
 

@@ -132,7 +132,7 @@ impl<'frame> Drawer<'frame> {
         platform: &mut Platform,
         scale_factor: f32,
     ) -> Result<(), BackendError> {
-        common::span!(_guard, "DrawOverlay", "Draw::Overlay");
+        common_log::span!(_guard, "DrawOverlay", "Draw::Overlay");
         // Finalize frame
         // FIX: Fixes cursor flickering, but cursor icons won't change
 

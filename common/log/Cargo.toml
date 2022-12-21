@@ -1,0 +1,11 @@
+[package]
+name = "ecg-common-log"
+version = "0.0.0"
+edition = "2021"
+
+[features]
+tracy = ["tracy-client"]
+
+[dependencies]
+tracing = { version = "0.1", default-features = false }
+tracy-client = { version = "0.15.0", optional = true }

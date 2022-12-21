@@ -5,8 +5,8 @@ use common::{
     block::Block,
     coord::{BlockCoord, ChunkCoord},
     direction::Direction,
-    prof,
 };
+use common_log::prof;
 
 use super::primitives::vertex::Vertex;
 

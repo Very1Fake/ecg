@@ -3,7 +3,7 @@ use std::{
     time::Duration,
 };
 
-use common::prof;
+use common_log::prof;
 use winit::event::{ElementState, VirtualKeyCode};
 
 use crate::types::{F32x2, F32x3, Mat4, Rad};

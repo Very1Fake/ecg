@@ -3,9 +3,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use common_base::span;
 use spin_sleep::sleep;
-
-use crate::span;
 
 /// Clock tries to keep tick a constant time
 pub struct Clock {

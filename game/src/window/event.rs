@@ -1,6 +1,6 @@
 use std::mem::replace;
 
-use common::span;
+use common_log::span;
 use tracing::debug;
 use winit::{
     dpi::PhysicalSize,

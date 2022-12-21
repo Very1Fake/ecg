@@ -3,8 +3,8 @@ use std::time::Duration;
 use common::{
     block::Block,
     coord::{ChunkId, CHUNK_SQUARE},
-    span,
 };
+use common_log::span;
 use wgpu::BufferUsages;
 use winit::event::{ElementState, VirtualKeyCode};
 

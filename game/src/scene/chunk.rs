@@ -6,8 +6,8 @@ use std::{
 use common::{
     block::Block,
     coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE},
-    prof, span,
 };
+use common_log::{prof, span};
 use tokio::runtime::Runtime;
 use wgpu::{BufferUsages, Device};
 

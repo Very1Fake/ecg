@@ -1,5 +1,5 @@
 use bytemuck::Pod;
-use common::span;
+use common_log::span;
 use tokio::runtime::Runtime;
 use tracing::{error, info, warn};
 use wgpu::{

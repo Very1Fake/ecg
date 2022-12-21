@@ -1,8 +1,4 @@
-pub mod clock;
-#[macro_use]
-pub mod macros;
 pub mod block;
+pub mod clock;
 pub mod coord;
 pub mod direction;
-
-pub use macros::*;

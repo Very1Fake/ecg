@@ -1,4 +1,4 @@
-use common::span;
+use common_log::span;
 use tracing::debug;
 use wgpu::{
     AddressMode, CompareFunction, Device, Extent3d, FilterMode, Sampler, SamplerDescriptor,

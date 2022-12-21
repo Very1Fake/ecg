@@ -1,5 +1,5 @@
 [workspace]
-members = ["./game", "./common"]
+members = ["game", "common", "common/log"]
 resolver = "2"
 
 [workspace.dependencies]

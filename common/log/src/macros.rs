@@ -1,3 +1,5 @@
+pub use tracing;
+
 #[cfg(feature = "tracy")]
 pub use tracy_client;
 
@@ -5,15 +7,15 @@ pub use tracy_client;
 #[macro_export]
 macro_rules! span {
     ($guard:tt, $level:ident, $label:expr, $($fields:tt)*) => {
-        let span = tracing::span!(tracing::Level::$level, $label, $($fields)*);
+        let span = $crate::tracing::span!(tracing::Level::$level, $label, $($fields)*);
         let $guard = span.enter();
     };
     ($guard:tt, $level:ident, $label:expr) => {
-        let span = tracing::span!(tracing::Level::$level, $label);
+        let span = $crate::tracing::span!(tracing::Level::$level, $label);
         let $guard = span.enter();
     };
     ($guard:tt, $label:expr) => {
-        let span = tracing::span!(tracing::Level::TRACE, $label);
+        let span = $crate::tracing::span!($crate::tracing::Level::TRACE, $label);
         let $guard = span.enter();
     };
     ($guard:tt, $no_tracy_label:expr, $tracy_label:expr) => {

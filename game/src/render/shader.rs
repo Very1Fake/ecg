@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use common::prof;
+use common_log::prof;
 use wgpu::{Device, ShaderModule, ShaderModuleDescriptor};
 
 // TODO: Make dynamic shader loading (at runtime)
