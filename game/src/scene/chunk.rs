@@ -111,7 +111,7 @@ impl ChunkManager {
             });
 
         // Load new chunks
-        LoadedArea::new_cuboid(
+        LoadArea::new_cuboid(
             GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
             self.draw_distance as i64,
         )
@@ -135,7 +135,7 @@ impl ChunkManager {
         });
 
         // Unload old chunks
-        let load_area = LoadedArea::new_cuboid(
+        let load_area = LoadArea::new_cuboid(
             GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
             self.draw_distance as i64,
         );
@@ -255,13 +255,13 @@ impl TerrainChunk {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-pub struct LoadedArea {
+pub struct LoadArea {
     start: ChunkId,
     end: ChunkId,
     current: ChunkId,
 }
 
-impl LoadedArea {
+impl LoadArea {
     const fn new(start: ChunkId, end: ChunkId) -> Self {
         Self {
             start,
@@ -294,7 +294,7 @@ impl LoadedArea {
     }
 }
 
-impl Iterator for LoadedArea {
+impl Iterator for LoadArea {
     type Item = ChunkId;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -331,16 +331,14 @@ impl Iterator for LoadedArea {
 mod tests {
     use common::coord::ChunkId;
 
-    use super::LoadedArea;
+    use super::LoadArea;
 
     #[test]
-    fn load_area() {
-        let chunks = LoadedArea::new_cube(ChunkId::ZERO, 1).collect::<Vec<_>>();
-
-        eprintln!("{}", chunks.len());
+    fn load_area_iter_cube() {
+        let loaded_area = LoadArea::new_cube(ChunkId::ZERO, 1).collect::<Vec<_>>();
 
         assert_eq!(
-            chunks,
+            loaded_area,
             [
                 ChunkId::new(-1, -1, -1),
                 ChunkId::new(0, -1, -1),
@@ -371,5 +369,35 @@ mod tests {
                 ChunkId::new(1, 1, 1),
             ]
         );
+    }
+
+    #[test]
+    fn load_area_iter_cuboid() {
+        let loaded_area = LoadArea::new_cuboid(ChunkId::ZERO, 1).collect::<Vec<_>>();
+
+        assert_eq!(
+            loaded_area,
+            [
+                ChunkId::new(-1, 0, -1),
+                ChunkId::new(0, 0, -1),
+                ChunkId::new(1, 0, -1),
+                ChunkId::new(-1, 0, 0),
+                ChunkId::ZERO,
+                ChunkId::new(1, 0, 0),
+                ChunkId::new(-1, 0, 1),
+                ChunkId::new(0, 0, 1),
+                ChunkId::new(1, 0, 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn load_area_contains() {
+        let load_area = LoadArea::new_cube(ChunkId::ZERO, 2);
+
+        assert!(load_area.contains(ChunkId::ZERO));
+        assert!(load_area.contains(ChunkId::new(1, 1, 1)));
+        assert!(!load_area.contains(ChunkId::new(3, 3, 3)));
+        assert!(!load_area.contains(ChunkId::new(3, 32, 12)));
     }
 }
