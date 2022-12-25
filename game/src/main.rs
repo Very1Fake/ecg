@@ -14,8 +14,8 @@ use ecg_game::{
 
 #[cfg_attr(feature = "tracy-memory", global_allocator)]
 #[cfg(feature = "tracy-memory")]
-static GLOBAL: common::tracy_client::ProfiledAllocator<std::alloc::System> =
-    common::tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
+static GLOBAL: common_log::tracy_client::ProfiledAllocator<std::alloc::System> =
+    common_log::tracy_client::ProfiledAllocator::new(std::alloc::System, 100);
 
 fn main() -> Result<(), Error> {
     bootstrap()?;

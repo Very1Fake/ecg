@@ -110,35 +110,33 @@ impl ChunkManager {
                 }
             });
 
-        // Load new chunks
-        LoadArea::new_cuboid(
+        let mut load_area = LoadArea::new_cuboid(
             GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
             self.draw_distance as i64,
-        )
-        .collect::<Vec<_>>()
-        .iter()
-        .filter(|id| {
-            !self.logic.contains_key(id)
-                && !self.chunk_gen_ids.contains(id)
-                && self.chunk_gen_ids.len() < *CPU_CORES
-        })
-        .take(*BLOCKING_THREADS * 4 - self.chunk_gen_ids.len())
-        .collect::<Vec<_>>()
-        .iter()
-        .for_each(|&&id| {
-            self.chunk_gen_ids.insert(id);
+            LoadAreaOrder::Linear,
+        );
 
-            let tx = self.chunk_gen_tx.clone();
-            runtime.spawn_blocking(move || {
-                let _ = tx.send((id, LogicChunk::generate_flat(id)));
+        // Load new chunks
+        load_area
+            .by_ref()
+            .filter(|id| {
+                !self.logic.contains_key(id)
+                    && !self.chunk_gen_ids.contains(id)
+                    && self.chunk_gen_ids.len() < *CPU_CORES
+            })
+            .take(*BLOCKING_THREADS * 4 - self.chunk_gen_ids.len())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|id| {
+                self.chunk_gen_ids.insert(id);
+
+                let tx = self.chunk_gen_tx.clone();
+                runtime.spawn_blocking(move || {
+                    let _ = tx.send((id, LogicChunk::generate_flat(id)));
+                });
             });
-        });
 
         // Unload old chunks
-        let load_area = LoadArea::new_cuboid(
-            GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
-            self.draw_distance as i64,
-        );
         self.logic
             .keys()
             .filter(|&id| !load_area.contains(*id))
@@ -255,32 +253,49 @@ impl TerrainChunk {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+#[derive(Clone, Copy, Default, Debug)]
+pub enum LoadAreaOrder {
+    #[default]
+    Linear,
+    Near,
+}
+
 pub struct LoadArea {
     start: ChunkId,
     end: ChunkId,
     current: ChunkId,
+    order: LoadAreaOrder,
 }
 
 impl LoadArea {
-    const fn new(start: ChunkId, end: ChunkId) -> Self {
+    #[inline]
+    const fn new(center: ChunkId, start: ChunkId, end: ChunkId, order: LoadAreaOrder) -> Self {
         Self {
             start,
             end,
-            current: start,
+            current: match order {
+                LoadAreaOrder::Linear => start,
+                LoadAreaOrder::Near => center,
+            },
+            order,
         }
     }
 
-    pub fn new_cube(center: ChunkId, dist: GlobalUnit) -> Self {
+    pub fn new_cube(center: ChunkId, dist: GlobalUnit, order: LoadAreaOrder) -> Self {
         Self::new(
+            center,
             ChunkId::new(center.x - dist, center.y - dist, center.z - dist),
             ChunkId::new(center.x + dist, center.y + dist, center.z + dist),
+            order,
         )
     }
 
-    pub fn new_cuboid(center: ChunkId, dist: GlobalUnit) -> Self {
+    pub fn new_cuboid(center: ChunkId, dist: GlobalUnit, order: LoadAreaOrder) -> Self {
         Self::new(
+            center,
             ChunkId::new(center.x - dist, center.y - dist / 2, center.z - dist),
             ChunkId::new(center.x + dist, center.y + dist / 2, center.z + dist),
+            order,
         )
     }
 
@@ -314,11 +329,30 @@ impl Iterator for LoadArea {
             }
         }
 
-        if clamped_inc(&mut new.x, self.end.x) {
-            new.x = self.start.x;
-            if clamped_inc(&mut new.y, self.end.y) {
-                new.y = self.start.y;
-                clamped_inc(&mut new.z, self.end.z + 1);
+        match self.order {
+            LoadAreaOrder::Linear => {
+                if new.x > self.end.x {
+                    new.x = self.start.x;
+                    if new.y > self.end.y {
+                        new.y = self.start.y;
+                        if new.z < self.end.z + 1 {
+                            new.z += 1;
+                        }
+                    } else {
+                        new.y += 1;
+                    }
+                } else {
+                    new.x += 1;
+                }
+            }
+            LoadAreaOrder::Near => {
+                if clamped_inc(&mut new.x, self.end.x) {
+                    new.x = self.start.x;
+                    if clamped_inc(&mut new.y, self.end.y) {
+                        new.y = self.start.y;
+                        clamped_inc(&mut new.z, self.end.z + 1);
+                    }
+                }
             }
         }
 
@@ -331,11 +365,12 @@ impl Iterator for LoadArea {
 mod tests {
     use common::coord::ChunkId;
 
-    use super::LoadArea;
+    use super::{LoadArea, LoadAreaOrder};
 
     #[test]
     fn load_area_iter_cube() {
-        let loaded_area = LoadArea::new_cube(ChunkId::ZERO, 1).collect::<Vec<_>>();
+        let loaded_area =
+            LoadArea::new_cube(ChunkId::ZERO, 1, LoadAreaOrder::Linear).collect::<Vec<_>>();
 
         assert_eq!(
             loaded_area,
@@ -373,7 +408,8 @@ mod tests {
 
     #[test]
     fn load_area_iter_cuboid() {
-        let loaded_area = LoadArea::new_cuboid(ChunkId::ZERO, 1).collect::<Vec<_>>();
+        let loaded_area =
+            LoadArea::new_cuboid(ChunkId::ZERO, 1, LoadAreaOrder::Linear).collect::<Vec<_>>();
 
         assert_eq!(
             loaded_area,
@@ -393,7 +429,7 @@ mod tests {
 
     #[test]
     fn load_area_contains() {
-        let load_area = LoadArea::new_cube(ChunkId::ZERO, 2);
+        let load_area = LoadArea::new_cube(ChunkId::ZERO, 2, LoadAreaOrder::default());
 
         assert!(load_area.contains(ChunkId::ZERO));
         assert!(load_area.contains(ChunkId::new(1, 1, 1)));
