@@ -3,14 +3,25 @@ use std::sync::mpsc::Sender;
 use crate::render::primitives::quad::Quad;
 use common::{
     block::Block,
-    coord::{BlockCoord, ChunkCoord},
+    coord::{BlockCoord, ChunkCoord, CHUNK_SIZE},
     direction::Direction,
 };
 use common_log::prof;
 
 use super::primitives::vertex::Vertex;
 
+pub type Neighbor = Option<[Block; CHUNK_SIZE]>;
 pub type MeshTaskResult = (ChunkCoord, TerrainMesh);
+
+#[derive(Default, Debug)]
+pub struct Neighbors {
+    down: Option<[Block; CHUNK_SIZE]>,
+    up: Option<[Block; CHUNK_SIZE]>,
+    left: Option<[Block; CHUNK_SIZE]>,
+    right: Option<[Block; CHUNK_SIZE]>,
+    front: Option<[Block; CHUNK_SIZE]>,
+    back: Option<[Block; CHUNK_SIZE]>,
+}
 
 /// Mesh builder for terrain chunks
 pub struct TerrainMesh {
@@ -19,11 +30,11 @@ pub struct TerrainMesh {
 }
 
 impl TerrainMesh {
-    pub fn task(tx: Sender<MeshTaskResult>, coord: ChunkCoord, blocks: &[Block]) {
-        let _ = tx.send((coord, Self::build(coord, blocks)));
+    pub fn task(tx: Sender<MeshTaskResult>, coord: ChunkCoord, blocks: &[Block], neighbors: Neighbors) {
+        let _ = tx.send((coord, Self::build(coord, blocks, neighbors)));
     }
 
-    pub fn build(coord: ChunkCoord, blocks: &[Block]) -> Self {
+    pub fn build(coord: ChunkCoord, blocks: &[Block], neighbors: Neighbors) -> Self {
         prof!("TerrainMesh::build");
 
         let mut vertices = Vec::new();

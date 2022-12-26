@@ -5,7 +5,8 @@ use std::{
 
 use common::{
     block::Block,
-    coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE},
+    coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE, CHUNK_SIZE, CHUNK_SQUARE},
+    direction::Direction,
 };
 use common_log::{prof, span};
 use tokio::runtime::Runtime;
@@ -15,7 +16,7 @@ use crate::{
     consts::{BLOCKING_THREADS, CPU_CORES},
     render::{
         buffer::Buffer,
-        mesh::{MeshTaskResult, TerrainMesh},
+        mesh::{MeshTaskResult, Neighbors, TerrainMesh},
         primitives::vertex::Vertex,
     },
 };
@@ -99,7 +100,7 @@ impl ChunkManager {
                     let coord = *coord;
                     let blocks = chunk.blocks;
                     runtime.spawn_blocking(move || {
-                        TerrainMesh::task(tx, coord.to_coord(), &blocks);
+                        TerrainMesh::task(tx, coord.to_coord(), &blocks, Neighbors::default());
                     });
 
                     chunk.status = TerrainStatus::Pending;
@@ -208,6 +209,52 @@ impl LogicChunk {
     pub fn blocks_mut(&mut self) -> &mut [Block; CHUNK_CUBE] {
         self.status = TerrainStatus::None;
         &mut self.blocks
+    }
+
+    pub fn edge(&self, dir: Direction) -> Vec<Block> {
+        match dir {
+            Direction::Down => self
+                .blocks
+                .iter()
+                .copied()
+                .enumerate()
+                .filter_map(|(i, b)| {
+                    if i % CHUNK_SQUARE < CHUNK_SIZE {
+                        Some(b)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>(),
+            Direction::Up => self
+                .blocks
+                .iter()
+                .copied()
+                .enumerate()
+                .filter_map(|(i, b)| {
+                    if (i % CHUNK_SQUARE) / (CHUNK_SQUARE - CHUNK_SIZE) == 1 {
+                        Some(b)
+                    } else {
+                        None
+                    }
+                })
+                .collect::<Vec<_>>(),
+            Direction::Left => self
+                .blocks
+                .iter()
+                .copied()
+                .skip(CHUNK_SIZE - 1)
+                .step_by(CHUNK_SIZE)
+                .collect::<Vec<_>>(),
+            Direction::Right => self
+                .blocks
+                .iter()
+                .copied()
+                .step_by(CHUNK_SIZE)
+                .collect::<Vec<_>>(),
+            Direction::Front => self.blocks[..CHUNK_SQUARE].to_vec(),
+            Direction::Back => self.blocks[(CHUNK_CUBE - CHUNK_SQUARE)..].to_vec(),
+        }
     }
 
     fn generate_flat(id: ChunkId) -> LogicChunk {
@@ -329,7 +376,7 @@ impl Iterator for LoadArea {
 
 #[cfg(test)]
 mod tests {
-    use common::coord::ChunkId;
+    use common::{block::Block, coord::ChunkId};
 
     use super::LoadArea;
 
@@ -399,5 +446,151 @@ mod tests {
         assert!(load_area.contains(ChunkId::new(1, 1, 1)));
         assert!(!load_area.contains(ChunkId::new(3, 3, 3)));
         assert!(!load_area.contains(ChunkId::new(3, 32, 12)));
+    }
+
+    const SIZE: usize = 3;
+    const SIZE_SQUARE: usize = SIZE.pow(2);
+    const SIZE_CUBE: usize = SIZE.pow(3);
+    #[rustfmt::skip]
+    const BLOCKS: [Block; SIZE_CUBE] = [
+        Block::Air, Block::Stone, Block::Air,
+        Block::Stone, Block::Air, Block::Stone,
+        Block::Air, Block::Stone, Block::Sand,
+
+        Block::Stone, Block::Leaves, Block::Stone,
+        Block::Grass, Block::Stone, Block::Dirt,
+        Block::Stone, Block::Air, Block::Stone,
+
+        Block::Air, Block::Stone, Block::Air,
+        Block::Stone, Block::Air, Block::Stone,
+        Block::Air, Block::Stone, Block::SandStone,
+    ];
+
+    #[test]
+    fn neighbor_up() {
+        assert_eq!(
+            BLOCKS
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, b)| if (i % SIZE_SQUARE) / (SIZE_SQUARE - SIZE) == 1 {
+                    Some(b)
+                } else {
+                    None
+                })
+                .collect::<Vec<_>>(),
+            [
+                Block::Air,
+                Block::Stone,
+                Block::Sand,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::SandStone,
+            ]
+        );
+    }
+
+    #[test]
+    fn neighbor_down() {
+        assert_eq!(
+            BLOCKS
+                .into_iter()
+                .enumerate()
+                .filter_map(|(i, b)| if i % SIZE_SQUARE < SIZE {
+                    Some(b)
+                } else {
+                    None
+                })
+                .collect::<Vec<_>>(),
+            [
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Leaves,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+            ]
+        );
+    }
+
+    #[test]
+    fn neighbor_left() {
+        assert_eq!(
+            BLOCKS
+                .into_iter()
+                .skip(SIZE - 1)
+                .step_by(SIZE)
+                .collect::<Vec<_>>(),
+            [
+                Block::Air,
+                Block::Stone,
+                Block::Sand,
+                Block::Stone,
+                Block::Dirt,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::SandStone,
+            ]
+        );
+    }
+
+    #[test]
+    fn neighbor_right() {
+        assert_eq!(
+            BLOCKS.into_iter().step_by(SIZE).collect::<Vec<_>>(),
+            [
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Grass,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+            ]
+        );
+    }
+
+    #[test]
+    fn neighbor_front() {
+        assert_eq!(
+            BLOCKS[..SIZE_SQUARE],
+            [
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Sand
+            ]
+        );
+    }
+
+    #[test]
+    fn neighbor_back() {
+        assert_eq!(
+            BLOCKS[(SIZE_CUBE - SIZE_SQUARE)..],
+            [
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::Air,
+                Block::Stone,
+                Block::SandStone,
+            ]
+        );
     }
 }
