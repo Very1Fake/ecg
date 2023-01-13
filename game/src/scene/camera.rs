@@ -211,7 +211,7 @@ impl Camera {
     }
 }
 
-fn lerp(lhs: f32, rhs: f32, f: f32) -> f32 {
+pub fn lerp(lhs: f32, rhs: f32, f: f32) -> f32 {
     // More precise, less performant
     lhs * (1.0 - f) + (rhs * f)
     // Less precise, more performant

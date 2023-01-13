@@ -1,17 +1,8 @@
 use std::{
-
     collections::{HashMap, HashSet},
-    sync::mpsc::{channel, Receiver, Sender},
+    sync::mpsc::{channel, Receiver, Sender}, f64::consts,
 };
 
-use common::{
-    block::Block,
-    coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE},
-    prof, span,
-};
-use tokio::runtime::Runtime;
-use wgpu::{BufferUsages, Device};
-use noise::{NoiseFn, Perlin, Seedable};
 use crate::{
     consts::{BLOCKING_THREADS, CPU_CORES},
     render::{
@@ -20,6 +11,14 @@ use crate::{
         primitives::vertex::Vertex,
     },
 };
+use common::{
+    block::Block,
+    coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE, CHUNK_SIZE},
+    prof, span,
+};
+use noise::{NoiseFn, Perlin, Simplex};
+use tokio::runtime::Runtime;
+use wgpu::{BufferUsages, Device};
 
 use super::camera::Camera;
 
@@ -171,6 +170,9 @@ pub struct LogicChunk {
 }
 
 impl LogicChunk {
+    const SEA_LEVEL: GlobalUnit = 0;
+    const SEA_LEVEL_BIAS: GlobalUnit = 25;
+
     pub const fn new() -> Self {
         Self {
             blocks: [Block::Air; CHUNK_CUBE],
@@ -194,19 +196,45 @@ impl LogicChunk {
         &mut self.blocks
     }
 
+    fn lerp(lhs: f64, rhs: f64, f: f64) -> f64 {
+        // More precise, less performant
+        lhs * (1.0 - f) + (rhs * f)
+        // Less precise, more performant
+        // lhs + f * (rhs - lhs)
+    }
+
     fn generate_flat(id: ChunkId) -> LogicChunk {
+        const NOISE_SCALE: f64 = 1.0;
+        const WAVELENGTH: f64 = 1.0;
+
         prof!("LogicChunk::generate_flat");
         let perlin = Perlin::new(Perlin::DEFAULT_SEED);
         let coord = id.to_coord();
         let mut blocks = [Block::Air; CHUNK_CUBE];
+        let height_map = (0..CHUNK_SIZE)
+            .map(|x| {
+                (0..CHUNK_SIZE)
+                    .map(|y| {
+                        let p = perlin.get([x as f64 + 0.5 / WAVELENGTH, y as f64 + 0.5 / WAVELENGTH])
+                        + 0.5 * perlin.get([2.0 * x as f64 + 0.5 / WAVELENGTH, 2.0 * y as f64 + 0.5 / WAVELENGTH])
+                        + 0.25 * perlin.get([4.0 * x as f64 + 0.5 / WAVELENGTH, 4.0 * y as f64 + 0.5 / WAVELENGTH]);
+                        Self::lerp(
+                            (Self::SEA_LEVEL - Self::SEA_LEVEL_BIAS) as f64,
+                            (Self::SEA_LEVEL + Self::SEA_LEVEL_BIAS) as f64,
+                            ((p).powf(consts::E) * 23.0).round() / 23.0,
+                        ) as GlobalUnit
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
         blocks.iter_mut().enumerate().for_each(|(i, block)| {
             let pos = coord.to_global(&BlockCoord::from(i));
-            match pos.y as f64 - perlin.get([pos.x as f64 + 0.1, pos.z as f64 + 0.1]) {
-                0.0 => *block = Block::Grass,
-                -10.0..=-1.0 => *block = Block::Dirt,
-                -128.0..=-11.0 => *block = Block::Stone,
-                ..=-129.0 => *block = Block::Stone,
-                _ => {}
+            let y_height = height_map[(pos.x as usize) % CHUNK_SIZE][(pos.z as usize) % CHUNK_SIZE];
+            *block = match pos.y {
+                y if y == y_height => Block::Grass,
+                y if y < y_height && y > y_height - 11 => Block::Dirt,
+                y if y < y_height - 10 => Block::Stone,
+                _ => Block::Air,
             };
         });
 

@@ -7,6 +7,7 @@ use common::{
     direction::Direction,
     prof,
 };
+use rand::{thread_rng, Rng};
 
 use super::primitives::vertex::Vertex;
 
@@ -26,6 +27,7 @@ impl TerrainMesh {
     pub fn build(coord: ChunkCoord, blocks: &[Block]) -> Self {
         prof!("TerrainMesh::build");
 
+        let mut rng = thread_rng();
         let mut vertices = Vec::new();
         let mut indices = Vec::new();
         let mut index: u32 = 0;
@@ -53,13 +55,17 @@ impl TerrainMesh {
                 None
             })
             .for_each(|(block, faces)| {
+                let mut color = block.color();
+                color.x = rng.gen_range(color.x - 0.05..=color.x + 0.05);
+                color.y = rng.gen_range(color.y - 0.05..=color.y + 0.05);
+                color.z = rng.gen_range(color.z - 0.05..=color.z + 0.05);
+
                 let mut block_vertices = faces
                     .into_iter()
                     .flat_map(|quad| {
-                        quad.corners().into_iter().map(|position| Vertex {
-                            position,
-                            color: block.color(),
-                        })
+                        quad.corners()
+                            .into_iter()
+                            .map(|position| Vertex { position, color })
                     })
                     .collect::<Vec<_>>();
 
