@@ -227,8 +227,8 @@ impl DebugOverlayState {
                         },
                     );
                     ui.label("Terrain Chunks:");
-                    ui.label(format!("\tVertices: {}", terrain_vertices));
-                    ui.label(format!("\tIndices: {}", terrain_indices));
+                    ui.label(format!("\tVertices: {terrain_vertices}"));
+                    ui.label(format!("\tIndices: {terrain_indices}"));
                 });
             });
 

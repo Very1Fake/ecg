@@ -1,11 +1,11 @@
 use bytemuck::Pod;
 use common_log::span;
 use tokio::runtime::Runtime;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 use wgpu::{
-    Backends, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Features,
-    Instance, PowerPreference, Queue, RequestAdapterOptions, Surface, SurfaceConfiguration,
-    SurfaceError, TextureUsages,
+    Backends, CommandEncoderDescriptor, CompositeAlphaMode, Device, DeviceDescriptor, Dx12Compiler,
+    Features, Instance, InstanceDescriptor, PowerPreference, Queue, RequestAdapterOptions, Surface,
+    SurfaceConfiguration, SurfaceError, TextureUsages,
 };
 use wgpu_profiler::{GpuProfiler, GpuTimerScopeResult};
 use winit::window::Window;
@@ -73,15 +73,19 @@ impl Renderer {
     ) -> Result<Self, RenderError> {
         let size = window.inner_size();
         // TODO: Parse backend from env
-        let backend = Backends::PRIMARY;
+        let backends = Backends::PRIMARY;
 
         // Create new API instance (Primary APIs: Vulkan, DX12, Metal)
-        let instance = Instance::new(backend);
+        let instance = Instance::new(InstanceDescriptor {
+            backends,
+            // TODO: upgrade to Dxc compiler
+            dx12_shader_compiler: Dx12Compiler::Fxc,
+        });
         // Unsafe, because we use raw window handle between winit and wgpu
-        let surface = unsafe { instance.create_surface(window) };
+        let surface = unsafe { instance.create_surface(window) }?;
 
         let adapters = instance
-            .enumerate_adapters(backend)
+            .enumerate_adapters(backends)
             .enumerate()
             .collect::<Vec<_>>();
 
@@ -131,20 +135,30 @@ impl Renderer {
             None,
         ))?;
 
-        device.on_uncaptured_error(move |err| {
+        device.on_uncaptured_error(Box::new(move |err| {
             error!("{err}");
-            panic!("wgpu fatal error:\n{:?}\n{:?}", err, info);
-        });
+            panic!("wgpu fatal error:\n{err:?}\n{info:?}");
+        }));
 
-        let surface_format = *surface
-            .get_supported_formats(&adapter)
-            .get(0)
-            .ok_or(RenderError::NoCompatibleSurfaceFormat)?;
-        info!("Using {surface_format:?} as surface format");
+        let caps = surface.get_capabilities(&adapter);
+        debug!("Available surface formats: {:?}", caps.formats);
+
+        let format = caps
+            .formats
+            .iter()
+            .copied()
+            .find(|f| f.describe().srgb)
+            .unwrap_or(
+                *caps
+                    .formats
+                    .first()
+                    .ok_or(RenderError::NoCompatibleSurfaceFormat)?,
+            );
+        info!("Using {format:?} as surface format");
 
         let config = SurfaceConfiguration {
             usage: TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
+            format,
             width: size.width,
             height: size.height,
             // Rendering mode
@@ -155,6 +169,7 @@ impl Renderer {
             // TODO: Add support for switching modes in game settings
             present_mode: render_mode.present_mode,
             alpha_mode: CompositeAlphaMode::Auto,
+            view_formats: Vec::new(),
         };
         surface.configure(&device, &config);
 
@@ -166,7 +181,7 @@ impl Renderer {
 
         #[cfg(feature = "debug_overlay")]
         let egui_render_pass =
-            egui_wgpu_backend::RenderPass::new(&device, wgpu::TextureFormat::Bgra8UnormSrgb, 1);
+            egui_wgpu_backend::RenderPass::new(&device, format, 1);
 
         let profiler = GpuProfiler::new(4, queue.get_timestamp_period(), device.features());
 

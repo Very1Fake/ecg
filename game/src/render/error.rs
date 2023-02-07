@@ -1,5 +1,5 @@
 use thiserror::Error;
-use wgpu::{RequestDeviceError, SurfaceError};
+use wgpu::{RequestDeviceError, SurfaceError, CreateSurfaceError};
 
 /// Represents one of renderer errors
 #[derive(Error, Debug)]
@@ -12,6 +12,8 @@ pub enum RenderError {
     NoCompatibleSurfaceFormat,
     #[error("Surface error: {0}")]
     SurfaceError(SurfaceError),
+    #[error("Surface creation error: {0}")]
+    CreateSurfaceError(CreateSurfaceError),
 }
 
 impl From<RequestDeviceError> for RenderError {
@@ -23,5 +25,11 @@ impl From<RequestDeviceError> for RenderError {
 impl From<SurfaceError> for RenderError {
     fn from(err: SurfaceError) -> Self {
         Self::SurfaceError(err)
+    }
+}
+
+impl From<CreateSurfaceError> for RenderError {
+    fn from(err: CreateSurfaceError) -> Self {
+        Self::CreateSurfaceError(err)
     }
 }

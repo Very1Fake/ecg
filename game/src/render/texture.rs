@@ -36,6 +36,7 @@ impl Texture {
             dimension: TextureDimension::D2,
             format: Self::DEPTH_FORMAT,
             usage: TextureUsages::RENDER_ATTACHMENT | TextureUsages::TEXTURE_BINDING,
+            view_formats: &[],
         });
 
         let view = texture.create_view(&TextureViewDescriptor::default());
@@ -49,7 +50,7 @@ impl Texture {
             mag_filter: FilterMode::Linear,
             min_filter: FilterMode::Linear,
             mipmap_filter: FilterMode::Nearest,
-            lod_min_clamp: -100.0,
+            lod_min_clamp: 0.0,
             lod_max_clamp: 100.0,
             compare: Some(CompareFunction::LessEqual),
             anisotropy_clamp: None,
