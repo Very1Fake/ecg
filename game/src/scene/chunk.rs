@@ -171,7 +171,7 @@ pub struct LogicChunk {
 
 impl LogicChunk {
     const SEA_LEVEL: GlobalUnit = 0;
-    const SEA_LEVEL_BIAS: GlobalUnit = 25;
+    const SEA_LEVEL_BIAS: GlobalUnit = 15;
 
     pub const fn new() -> Self {
         Self {
@@ -205,7 +205,7 @@ impl LogicChunk {
 
     fn generate_flat(id: ChunkId) -> LogicChunk {
         const NOISE_SCALE: f64 = 1.0;
-        const WAVELENGTH: f64 = 1.0;
+        const WAVELENGTH: f64 = 10.0;
 
         prof!("LogicChunk::generate_flat");
         let perlin = Perlin::new(Perlin::DEFAULT_SEED);
@@ -214,26 +214,27 @@ impl LogicChunk {
         let height_map = (0..CHUNK_SIZE)
             .map(|x| {
                 (0..CHUNK_SIZE)
-                    .map(|y| {
-                        let p = perlin.get([x as f64 + 0.5 / WAVELENGTH, y as f64 + 0.5 / WAVELENGTH])
-                        + 0.5 * perlin.get([2.0 * x as f64 + 0.5 / WAVELENGTH, 2.0 * y as f64 + 0.5 / WAVELENGTH])
-                        + 0.25 * perlin.get([4.0 * x as f64 + 0.5 / WAVELENGTH, 4.0 * y as f64 + 0.5 / WAVELENGTH]);
-                        Self::lerp(
-                            (Self::SEA_LEVEL - Self::SEA_LEVEL_BIAS) as f64,
-                            (Self::SEA_LEVEL + Self::SEA_LEVEL_BIAS) as f64,
-                            ((p).powf(consts::E) * 23.0).round() / 23.0,
-                        ) as GlobalUnit
-                    })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>();
+                .map(|y| {
+                    let p = perlin.get([(x as f64 + coord.x as f64) * 0.1 / WAVELENGTH,
+                     (y as f64 + coord.z as f64) * 0.1 / WAVELENGTH]);
+                    Self::lerp(
+                        (Self::SEA_LEVEL - Self::SEA_LEVEL_BIAS) as f64,
+                        (Self::SEA_LEVEL + Self::SEA_LEVEL_BIAS) as f64,
+                        p
+                        //((p).powf(consts::E) * 23.0).round() / 23.0,
+                    ) as GlobalUnit
+                })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
         blocks.iter_mut().enumerate().for_each(|(i, block)| {
             let pos = coord.to_global(&BlockCoord::from(i));
             let y_height = height_map[(pos.x as usize) % CHUNK_SIZE][(pos.z as usize) % CHUNK_SIZE];
             *block = match pos.y {
-                y if y == y_height => Block::Grass,
+                y if y == y_height => if y > Self::SEA_LEVEL-20 {Block::Grass} else {Block::Sand},
                 y if y < y_height && y > y_height - 11 => Block::Dirt,
                 y if y < y_height - 10 => Block::Stone,
+                y if y > y_height && y < Self::SEA_LEVEL-20 => Block::Water,
                 _ => Block::Air,
             };
         });
