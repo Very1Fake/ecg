@@ -228,7 +228,7 @@ fn lerp_angle(lhs: f32, rhs: f32, f: f32) -> f32 {
 fn clamp(rot: F32x2) -> F32x2 {
     F32x2::new(
         rot.x.rem_euclid(TAU),
-        rot.y.min(FRAC_PI_2 - 0.001).max(-FRAC_PI_2 + 0.001),
+        rot.y.clamp(-FRAC_PI_2 + 0.001, FRAC_PI_2 - 0.001),
     )
 }
 

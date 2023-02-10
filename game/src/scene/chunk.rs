@@ -3,14 +3,6 @@ use std::{
     sync::mpsc::{channel, Receiver, Sender},
 };
 
-use common::{
-    block::Block,
-    coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE},
-};
-use common_log::{prof, span};
-use tokio::runtime::Runtime;
-use wgpu::{BufferUsages, Device};
-
 use crate::{
     consts::{BLOCKING_THREADS, CPU_CORES},
     render::{
@@ -19,6 +11,14 @@ use crate::{
         primitives::vertex::Vertex,
     },
 };
+use common::{
+    block::Block,
+    coord::{BlockCoord, ChunkId, GlobalCoord, GlobalUnit, CHUNK_CUBE, CHUNK_SIZE},
+};
+use common_log::{prof, span};
+use noise::{NoiseFn, Perlin};
+use tokio::runtime::Runtime;
+use wgpu::{BufferUsages, Device};
 
 use super::camera::Camera;
 
@@ -115,8 +115,6 @@ impl ChunkManager {
             GlobalCoord::from_vec3(camera.pos).to_chunk_id(),
             self.draw_distance as i64,
         )
-        .collect::<Vec<_>>()
-        .iter()
         .filter(|id| {
             !self.logic.contains_key(id)
                 && !self.chunk_gen_ids.contains(id)
@@ -125,7 +123,8 @@ impl ChunkManager {
         .take(*BLOCKING_THREADS * 4 - self.chunk_gen_ids.len())
         .collect::<Vec<_>>()
         .iter()
-        .for_each(|&&id| {
+        .for_each(|id| {
+            let id = *id;
             self.chunk_gen_ids.insert(id);
 
             let tx = self.chunk_gen_tx.clone();
@@ -187,6 +186,9 @@ pub struct LogicChunk {
 }
 
 impl LogicChunk {
+    const SEA_LEVEL: GlobalUnit = 0;
+    const SEA_LEVEL_BIAS: GlobalUnit = 15;
+
     pub const fn new() -> Self {
         Self {
             blocks: [Block::Air; CHUNK_CUBE],
@@ -210,21 +212,52 @@ impl LogicChunk {
         &mut self.blocks
     }
 
-    fn generate_flat(id: ChunkId) -> LogicChunk {
-        prof!("LogicChunk::generate_flat");
+    fn lerp(lhs: f64, rhs: f64, f: f64) -> f64 {
+        // More precise, less performant
+        lhs * (1.0 - f) + (rhs * f)
+        // Less precise, more performant
+        // lhs + f * (rhs - lhs)
+    }
 
+    fn generate_flat(id: ChunkId) -> LogicChunk {
+        const WAVELENGTH: f64 = 10.0;
+
+        prof!("LogicChunk::generate_flat");
+        let perlin = Perlin::new(Perlin::DEFAULT_SEED);
         let coord = id.to_coord();
         let mut blocks = [Block::Air; CHUNK_CUBE];
-
+        let height_map = (0..CHUNK_SIZE)
+            .map(|x| {
+                (0..CHUNK_SIZE)
+                    .map(|y| {
+                        let p = perlin.get([
+                            (x as f64 + coord.x as f64) * 0.1 / WAVELENGTH,
+                            (y as f64 + coord.z as f64) * 0.1 / WAVELENGTH,
+                        ]);
+                        Self::lerp(
+                            (Self::SEA_LEVEL - Self::SEA_LEVEL_BIAS) as f64,
+                            (Self::SEA_LEVEL + Self::SEA_LEVEL_BIAS) as f64,
+                            p,
+                        ) as GlobalUnit
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
         blocks.iter_mut().enumerate().for_each(|(i, block)| {
             let pos = coord.to_global(&BlockCoord::from(i));
-
-            match pos.y {
-                0 => *block = Block::Grass,
-                -10..=-1 => *block = Block::Dirt,
-                -128..=-11 => *block = Block::Stone,
-                GlobalUnit::MIN..=-129 => *block = Block::Stone,
-                _ => {}
+            let y_height = height_map[(pos.x as usize) % CHUNK_SIZE][(pos.z as usize) % CHUNK_SIZE];
+            *block = match pos.y {
+                y if y == y_height => {
+                    if y > Self::SEA_LEVEL - 20 {
+                        Block::Grass
+                    } else {
+                        Block::Sand
+                    }
+                }
+                y if y < y_height && y > y_height - 11 => Block::Dirt,
+                y if y < y_height - 10 => Block::Stone,
+                y if y > y_height && y < Self::SEA_LEVEL - 20 => Block::Water,
+                _ => Block::Air,
             };
         });
 
